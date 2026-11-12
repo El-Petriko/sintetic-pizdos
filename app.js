@@ -38,6 +38,11 @@ const fit = (t, n) => { t.slots.length = n; t.slots = Array.from(t.slots, x => x
 
 function normalize(s) {
   s.playing ||= ['t1', 't2'];
+  // meciul curent: număr, golurile înregistrate și cronometrul (acc = ms scurși înainte de ultimul start)
+  s.game ||= 1;
+  s.goals ||= [];
+  s.timer ||= { startedAt: null, acc: 0 };
+  s.matchMin ||= 7;
   for (const t of s.teams) {
     t.slots ||= t.members || []; delete t.members; // migrare din prima versiune
     t.custom ||= {};
@@ -146,7 +151,11 @@ function render() {
   const wait = state.teams.find(t => !state.playing.includes(t.id));
   $('#halves').innerHTML = half(L, 'L') + half(R, 'R');
   const side = (t, cls) => `<span class="side ${cls}" style="--team:${t.color}"><i></i>${esc(t.name)}<small>${formationOf(t)}</small></span>`;
-  $('#matchup').innerHTML = side(L, 'l') + '<span class="vs">VS</span>' + side(R, 'r');
+  const score = t => state.goals.filter(g => g.game === state.game && g.team === t.id).length;
+  $('#matchup').innerHTML = side(L, 'l') + `<span class="vs score" title="Meciul ${state.game}">${score(L)} – ${score(R)}</span>` + side(R, 'r');
+  $('#game-no').textContent = `Meci ${state.game}`;
+  renderGoals();
+  tick();
   $('#bench').innerHTML = `<i style="background:${wait.color}"></i>Pe margine: <b>${esc(wait.name)}</b>
     ${[L, R].map(t => `<button class="ghost-btn sm" data-swap="${t.id}">intră în locul ${esc(t.name)}</button>`).join('')}`;
 
@@ -361,7 +370,7 @@ $('#bench').addEventListener('click', e => {
   const out = e.target.dataset.swap;
   if (!out) return;
   const wait = state.teams.find(t => !state.playing.includes(t.id));
-  commit(() => { state.playing[state.playing.indexOf(out)] = wait.id; });
+  commit(() => { state.playing[state.playing.indexOf(out)] = wait.id; newGame(); });
 });
 $('#teams').addEventListener('click', e => {
   const f = e.target.dataset.form;
@@ -503,6 +512,144 @@ dlg.addEventListener('close', () => {
   });
 });
 
+/* ---------- meci: cronometru, goluri ---------- */
+const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const hhmm = ts => new Date(ts).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+const dur = () => state.matchMin * 60000;
+const elapsed = () => state.timer.acc + (state.timer.startedAt ? Date.now() - state.timer.startedAt : 0);
+const running = () => !!state?.timer.startedAt;
+
+function newGame() {
+  state.game++;
+  state.timer = { startedAt: null, acc: 0 };
+  ring(false);
+}
+
+function tick() {
+  if (!state) return;
+  const left = Math.max(0, dur() - elapsed());
+  if (running() && left === 0) return finish();
+  $('#clock').textContent = mmss(left);
+  $('#timer').classList.toggle('on', running());
+  $('#timer').classList.toggle('done', left === 0);
+  $('#timer').title = running() ? 'Pauză' : left === 0 ? 'Resetează cronometrul' : elapsed() ? 'Continuă' : 'Pornește cronometrul';
+}
+setInterval(tick, 250);
+
+// Sunetul se poate porni doar după o atingere: contextul audio se creează la Start.
+let audio, lock, tones = [];
+function tone(at, freq) {
+  const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + at;
+  o.type = 'square';
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(.35, t + .02);
+  g.gain.exponentialRampToValueAtTime(.0001, t + .3);
+  o.connect(g).connect(audio.destination);
+  o.start(t);
+  o.stop(t + .35);
+  tones.push(o);
+}
+// alarma: 3 reprize de câte 8 bipuri (~11 s); o atingere pe cronometru o oprește
+function ring(on) {
+  document.body.classList.toggle('alarm', on);
+  tones.forEach(o => { try { o.stop(); } catch {} });
+  tones = [];
+  if (!on) return navigator.vibrate?.(0);
+  navigator.vibrate?.([500, 200, 500, 200, 900, 1500, 500, 200, 500, 200, 900, 1500, 500, 200, 500, 200, 900]);
+  if (audio) for (let i = 0; i < 24; i++) tone(i * .4 + Math.floor(i / 8) * 1.2, i % 2 ? 660 : 880);
+}
+// ecranul rămâne aprins cât merge cronometrul (altfel telefonul se blochează și alarma întârzie)
+async function keepAwake(on) {
+  try {
+    if (on && !lock && navigator.wakeLock) lock = await navigator.wakeLock.request('screen');
+    if (!on && lock) { await lock.release(); lock = null; }
+  } catch {}
+}
+document.addEventListener('visibilitychange', () => { lock = null; if (!document.hidden && running()) keepAwake(true); });
+
+function finish() {
+  state.timer = { startedAt: null, acc: dur() };
+  save();
+  tick();
+  keepAwake(false);
+  ring(true);
+  toast('Timpul a expirat!');
+}
+
+$('#timer').addEventListener('click', () => {
+  audio ||= window.AudioContext && new AudioContext();
+  audio?.resume();
+  ring(false);
+  const t = state.timer;
+  if (running()) state.timer = { startedAt: null, acc: elapsed() };      // pauză
+  else if (elapsed() >= dur()) state.timer = { startedAt: null, acc: 0 }; // gata: înapoi la 7:00
+  else t.startedAt = Date.now();                                          // start / continuă
+  keepAwake(running());
+  save();
+  tick();
+});
+$('#timer-reset').addEventListener('click', () => {
+  if (running() && !confirm('Oprești și resetezi cronometrul?')) return;
+  state.timer = { startedAt: null, acc: 0 };
+  ring(false); keepAwake(false); save(); tick();
+});
+$('#new-game').addEventListener('click', () => {
+  if (!confirm(`Începi meciul ${state.game + 1}? Scorul pornește de la 0–0.`)) return;
+  keepAwake(false);
+  commit(newGame);
+});
+
+const goalDlg = $('#goal');
+$('#goal-btn').addEventListener('click', () => {
+  const cols = state.playing.map(team).map(t => {
+    const ps = t.slots.filter(Boolean).map(player);
+    return `<div class="goal-col" style="--team:${t.color}"><h3><i></i>${esc(t.name)}</h3>${ps.length
+      ? ps.map(p => `<button type="button" class="scorer" data-scorer="${p.id}" data-team="${t.id}">${avatar(p)}<span>${esc(p.name)}</span></button>`).join('')
+      : '<p class="hint">Niciun jucător în echipă.</p>'}</div>`;
+  });
+  $('#goal-cols').innerHTML = cols.join('');
+  $('#goal-time').textContent = `${hhmm(Date.now())}${elapsed() ? ` · minutul ${mmss(elapsed())}` : ''} · meciul ${state.game}`;
+  goalDlg.showModal();
+});
+goalDlg.addEventListener('click', e => {
+  const b = e.target.closest('[data-scorer]');
+  if (!b) return;
+  const p = player(b.dataset.scorer), t = team(b.dataset.team);
+  goalDlg.close();
+  commit(() => state.goals.push({
+    id: uid(), player: p.id, team: t.id, vs: [...state.playing], game: state.game,
+    at: Date.now(), t: elapsed() ? Math.round(elapsed()) : null,
+  }));
+  navigator.vibrate?.(60);
+  toast(`⚽ Gol! ${p.name} (${t.name})`);
+});
+
+function renderGoals() {
+  const box = $('#goals');
+  box.hidden = !state.goals.length;
+  if (!state.goals.length) return;
+  const name = id => player(id)?.name || 'jucător șters';
+  const tally = {};
+  state.goals.forEach(g => (tally[g.player] = (tally[g.player] || 0) + 1));
+  const top = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, n]) => `${esc(name(id))} ${n}`).join(' · ');
+  const games = [...new Set(state.goals.map(g => g.game))].sort((a, b) => b - a);
+  box.innerHTML = `<div class="panel-head"><h2>Goluri <span class="count">${state.goals.length}</span></h2><small class="top">Golgheteri: ${top}</small></div>
+    <div class="list">${games.map(n => {
+      const gs = state.goals.filter(g => g.game === n), [a, b] = gs[0].vs.map(team);
+      const sc = t => gs.filter(g => g.team === t.id).length;
+      return `<div class="game"><b>Meci ${n}</b> <span>${esc(a.name)} ${sc(a)} – ${sc(b)} ${esc(b.name)}</span></div>` +
+        gs.slice().reverse().map(g => `<div class="goal-row" style="--team:${team(g.team).color}">
+          <i></i><span class="gt">${hhmm(g.at)}${g.t != null ? `<small>min ${mmss(g.t)}</small>` : ''}</span>
+          <span class="gn">${esc(name(g.player))}</span>
+          <button class="ghost-btn sm danger-x" data-del-goal="${g.id}" aria-label="Șterge golul">✕</button></div>`).join('');
+    }).join('')}</div>`;
+}
+$('#goals').addEventListener('click', e => {
+  const id = e.target.closest('[data-del-goal]')?.dataset.delGoal;
+  if (id && confirm('Ștergi golul?')) commit(() => { state.goals = state.goals.filter(g => g.id !== id); });
+});
+
 /* ---------- sesiuni ---------- */
 // Fișier de sesiune: vezi README.md („Format sesiune”). Jucătorii din echipe se pot da prin id sau prin nume.
 const SESSION_FORMAT = 'sintetic-sesiune';
@@ -517,8 +664,10 @@ const cleanMeta = d => ({
   start: /^\d{2}:\d{2}$/.test(d.start) ? d.start : '',
   end: /^\d{2}:\d{2}$/.test(d.end) ? d.end : '',
   venue: str(d.venue, 40),
+  matchMin: Number.isInteger(+d.matchMin) && +d.matchMin >= 1 && +d.matchMin <= 60 ? +d.matchMin : 7,
 });
 
+const idx = (s, tid) => s.teams.findIndex(t => t.id === tid);
 function sessionToFile(s) {
   return {
     format: SESSION_FORMAT, version: 1,
@@ -526,6 +675,8 @@ function sessionToFile(s) {
     players: s.players.map(exportPlayer),
     teams: s.teams.map(t => ({ name: t.name, color: t.color, formation: t.formation || FORMATIONS[s.size][0], slots: t.slots, custom: t.custom })),
     playing: s.playing.map(id => s.teams.findIndex(t => t.id === id)),
+    matchMin: s.matchMin, game: s.game,
+    goals: s.goals.map(g => ({ player: g.player, team: idx(s, g.team), vs: g.vs.map(v => idx(s, v)), game: g.game, at: g.at, t: g.t })),
   };
 }
 
@@ -557,6 +708,15 @@ function sessionFromFile(d) {
   });
   const pl = Array.isArray(d.playing) ? d.playing.map(i => s.teams[i]?.id) : [];
   if (pl.length === 2 && pl[0] && pl[1] && pl[0] !== pl[1]) s.playing = pl;
+  const tid = i => s.teams[i]?.id;
+  for (const g of Array.isArray(d.goals) ? d.goals : []) {
+    const pid = typeof g?.player === 'string' && (ref.get(g.player) || ref.get(g.player.trim().toLowerCase()));
+    const vs = Array.isArray(g.vs) ? g.vs.map(tid) : [];
+    if (!pid || !tid(g.team) || !Number.isInteger(g.game) || g.game < 1 || !Number.isFinite(g.at)) continue;
+    s.goals.push({ id: uid(), player: pid, team: tid(g.team), vs: vs.length === 2 && vs[0] && vs[1] ? vs : [...s.playing],
+      game: g.game, at: g.at, t: Number.isFinite(g.t) && g.t >= 0 ? g.t : null });
+  }
+  if (Number.isInteger(d.game) && d.game >= 1) s.game = Math.max(d.game, ...s.goals.map(g => g.game));
   return s;
 }
 
@@ -662,7 +822,7 @@ nsDlg.addEventListener('close', async () => {
 
 function fillMenu() {
   const f = smDlg.querySelector('form');
-  for (const k of ['name', 'date', 'start', 'end', 'venue']) f.elements[k].value = state[k] || '';
+  for (const k of ['name', 'date', 'start', 'end', 'venue', 'matchMin']) f.elements[k].value = state[k] || '';
   const h = handles[state.id];
   $('#sm-file').textContent = h ? `Fișier: ${h.name}` : state.fileName ? `Fișier: ${state.fileName} (pe acest dispozitiv salvarea descarcă o copie nouă)` : 'Sesiunea nu a fost salvată încă într-un fișier.';
   $('#sm-save').textContent = h ? `Salvează în ${h.name}` : 'Salvează în fișier';
@@ -678,7 +838,7 @@ const openMenu = () => { fillMenu(); smDlg.showModal(); };
 $('#session').addEventListener('click', openMenu);
 smDlg.addEventListener('change', e => { // detaliile se salvează pe loc
   const k = e.target.name;
-  if (!['name', 'date', 'start', 'end', 'venue'].includes(k)) return;
+  if (!['name', 'date', 'start', 'end', 'venue', 'matchMin'].includes(k)) return;
   Object.assign(state, { [k]: cleanMeta({ ...state, [k]: e.target.value })[k] });
   save(); render();
 });

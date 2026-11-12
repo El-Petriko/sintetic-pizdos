@@ -1,6 +1,7 @@
 # Sintetic
 
-Manager de echipe pentru fotbal pe sintetic: 3 echipe de 5 sau 6 jucători, teren cu formații, drag & drop sau atingere.
+Manager de echipe pentru fotbal pe sintetic: 3 echipe de 5 sau 6 jucători, teren cu formații, drag & drop sau atingere,
+cronometru de meci cu alarmă și înregistrarea golurilor.
 Online: https://el-petriko.github.io/sintetic/
 
 Totul rulează în browser, fără server. Sesiunile stau în browserul dispozitivului (localStorage) și se pot salva în fișiere `.json`.
@@ -42,6 +43,9 @@ python3 -m http.server 8080
 - Formații: 5×5 `2-2`, `1-2-1`, `2-1-1`, `3-1`; 6×6 `2-2-1`, `2-1-2`, `3-1-1`, `1-3-1`.
 - `playing`: indicii celor 2 echipe de pe teren; a treia stă pe margine.
 - Fișierele salvate de aplicație au în plus `id` pe jucători și `custom` pe echipe (pozițiile mutate de mână).
+- `matchMin` (opțional, implicit 7): minutele unui meci, pentru cronometru.
+- `game` și `goals` (le scrie aplicația): numărul meciului curent și golurile, fiecare
+  `{"player": "<id sau nume>", "team": 0, "vs": [0, 1], "game": 1, "at": <ms Unix>, "t": <ms din meci sau null>}`.
 
 ## Format listă de jucători
 

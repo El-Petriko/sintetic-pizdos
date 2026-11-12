@@ -66,6 +66,9 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   Formatul e în README.md. Poziții exacte (LW, ST…) pe jucători (`role`), încadrate automat în P/F/M/A.
 - Fișierul pentru 2026-11-12 (Terenul Verde, 18–20, 15 jucători) e în `~/Desktop/sintetic-2026-11-12.json`, nu în repo (nume reale).
 - Teste în pane-ul ascuns: și evenimentul `close` al dialogurilor așteaptă randarea; un screenshot mic între pași îl declanșează.
+- Meci (2026-11-12): bară cu cronometru (`matchMin`, implicit 7; `timer = {startedAt, acc}` salvat în sesiune, supraviețuiește reload-ului),
+  alarmă Web Audio în 3 reprize + vibrație + clipire, Wake Lock cât merge; GOL → dialog cu jucătorii celor 2 echipe de pe teren,
+  gol = `{player, team, vs, game, at, t}`; scorul meciului curent în locul lui „VS”; meci nou la „Meci nou” sau la intrarea echipei de pe margine.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași

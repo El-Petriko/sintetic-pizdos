@@ -264,10 +264,14 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   .layout { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 96px; }
   main { display: contents; }
   .matchup { order: 1; gap: 8px; }
-  .pitch { order: 2; }
-  .bench { order: 3; }
-  .pool { order: 4; position: static; max-height: none; }
-  .teams { order: 5; grid-template-columns: minmax(0, 1fr); }
+  .matchbar { order: 2; }
+  .pitch { order: 3; }
+  .bench { order: 4; }
+  .goals { order: 5; }
+  .pool { order: 6; position: static; max-height: none; }
+  .teams { order: 7; grid-template-columns: minmax(0, 1fr); }
+  .game-no { display: none; }
+  .goal-btn { flex: 1; }
 
   .side { font-size: 15px; gap: 6px; }
   .side small { display: none; }
@@ -311,3 +315,58 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   box-shadow: 0 12px 30px #000a; animation: pop .25s ease-out;
 }
 .update[hidden] { display: none; }
+
+/* ---------- meci: scor, cronometru, gol ---------- */
+.vs.score { font-size: 22px; letter-spacing: 1px; color: var(--text); padding: 4px 14px; font-variant-numeric: tabular-nums; }
+.matchbar { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.game-no { color: var(--muted); font-size: 13px; font-weight: 700; margin-right: auto; }
+#new-game { margin-left: auto; }
+.timer {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px;
+  background: var(--panel-2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; transition: all .15s;
+}
+.timer b { font-size: 22px; min-width: 62px; text-align: left; }
+.timer .ico::before { content: '▶'; color: var(--accent); }
+.timer.on { border-color: var(--accent); }
+.timer.on .ico::before { content: '❚❚'; font-size: 12px; }
+.timer.done { border-color: var(--danger); color: var(--danger); }
+.timer.done .ico::before { content: '↺'; color: var(--danger); }
+.alarm .timer { animation: flash .5s steps(2) infinite; }
+@keyframes flash { 50% { background: var(--danger); color: #fff; } }
+.goal-btn {
+  padding: 10px 22px; border-radius: 12px; font-size: 17px; font-weight: 900; letter-spacing: .5px;
+  background: linear-gradient(180deg, #ffd166, #f4a52a); color: #2a1a00; box-shadow: 0 6px 18px #f4b74033; transition: transform .1s, filter .15s;
+}
+.goal-btn:hover { filter: brightness(1.08); }
+.goal-btn:active { transform: scale(.96); }
+
+#goal { width: 560px; }
+.goal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.goal-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.goal-col h3 { margin: 0 0 2px; display: flex; align-items: center; gap: 6px; color: var(--text); text-transform: none; letter-spacing: 0; font-size: 15px; }
+.goal-col h3 i { width: 10px; height: 10px; border-radius: 50%; background: var(--team); }
+.scorer {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; min-height: 46px; text-align: left;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; transition: border-color .15s, transform .1s;
+}
+.scorer:hover { border-color: var(--team); }
+.scorer:active { transform: scale(.97); }
+.scorer .av { box-shadow: 0 0 0 2px var(--team); }
+.scorer span { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.goals[hidden] { display: none; }
+.goals .panel-head { flex-wrap: wrap; gap: 4px 12px; }
+.goals .top { color: var(--muted); font-size: 12px; }
+.goals .list { gap: 4px; max-height: 320px; }
+.game { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); padding: 8px 4px 2px; }
+.game b { color: var(--text); }
+.goal-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: var(--panel-2); }
+.goal-row i { width: 4px; align-self: stretch; border-radius: 2px; background: var(--team); }
+.goal-row .gt { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; display: flex; flex-direction: column; min-width: 54px; }
+.goal-row .gt small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.goal-row .gn { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) {
+  .goal-cols { grid-template-columns: 1fr; }
+  .timer { padding: 8px 12px; }
+  .goal-btn { padding: 10px 12px; }
+}
