@@ -78,7 +78,8 @@ function persist() {
   store.current = state.id;
   try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
 }
-const save = () => { persist(); push(); }; // push: trimite schimbarea în sesiunea live, dacă e cazul
+// push: trimite schimbarea în sesiunea live, dacă e cazul. Spectatorul poate schimba doar golurile și cronometrul.
+const save = () => { if (forbidden()) return revert(); persist(); push(); };
 
 const player = id => state.players.find(p => p.id === id);
 const team = id => state.teams.find(t => t.id === id);
@@ -145,6 +146,7 @@ function render() {
   stale = false;
   $('#session').classList.toggle('live', !!state.live);
   $('#session').classList.toggle('offline', !!state.live && !online);
+  document.body.classList.toggle('viewer', viewer());
   $('#s-name').textContent = state.name;
   $('#s-meta').textContent = [when(state), state.venue].filter(Boolean).join(' · ');
   document.title = `${state.name} · sintetic-pizdos`;
@@ -228,7 +230,7 @@ const HOLD_MS = 250;
 
 document.addEventListener('pointerdown', e => {
   const c = e.target.closest('.chip, .token[data-id]');
-  if (!c || e.button !== 0) return;
+  if (!c || e.button !== 0 || viewer()) return;
   const touch = e.pointerType === 'touch';
   if (!touch) e.preventDefault();
   drag = { id: c.dataset.id, src: c, x0: e.clientX, y0: e.clientY, ghost: null, zone: null, over: null, armed: !touch };
@@ -362,7 +364,7 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('dblclick', e => {
   const c = e.target.closest('[data-id]');
-  if (c) { sel = null; render(); openEditor(c.dataset.id); }
+  if (c && !viewer()) { sel = null; render(); openEditor(c.dataset.id); }
 });
 
 /* ---------- header, teren, echipe ---------- */
@@ -841,12 +843,16 @@ function fillMenu() {
   for (const k of ['name', 'date', 'start', 'end', 'venue', 'matchMin']) f.elements[k].value = state[k] || '';
   const h = handles[state.id];
   $('#sm-file').textContent = h ? `Fișier: ${h.name}` : state.fileName ? `Fișier: ${state.fileName} (pe acest dispozitiv salvarea descarcă o copie nouă)` : 'Sesiunea nu a fost salvată încă într-un fișier.';
-  $('#sm-live').innerHTML = state.live
-    ? `<p><b class="live-dot${online ? '' : ' off'}">LIVE</b> ${online ? 'Conectat. Oricine are linkul vede și modifică sesiunea.' : 'Fără semnal: modificările se trimit când revine.'}</p>
+  const org = fb?.au.currentUser && !fb.au.currentUser.isAnonymous;
+  $('#sm-live').innerHTML = (state.live
+    ? `<p><b class="live-dot${online ? '' : ' off'}">LIVE</b> ${!online ? 'Fără semnal: modificările se trimit când revine.'
+        : viewer() ? 'Ești spectator: poți înregistra goluri și porni cronometrul.' : 'Ești organizatorul. Colegii cu linkul pot înregistra goluri și porni cronometrul.'}</p>
        <div class="actions"><button type="button" class="primary" data-act="live-share">Trimite linkul</button>
        <button type="button" class="ghost-btn" data-act="live-off">Oprește live pe acest dispozitiv</button></div>`
-    : `<button type="button" class="primary" data-act="live-on">📡 Pune online</button>
-       <p class="hint">Primești un link: colegii văd și modifică live echipele, golurile și cronometrul.</p>`;
+    : `<button type="button" class="primary" data-act="live-on">📡 Pune online${org ? '' : ' (organizator)'}</button>
+       <p class="hint">Primești un link: colegii văd live echipele și pot înregistra goluri și porni cronometrul.</p>`)
+    + (org ? `<button type="button" class="ghost-btn sm" data-act="logout">Ieși din contul de organizator</button>` : '');
+  f.querySelectorAll('[name=name], [name=date], [name=start], [name=end], [name=venue], [name=matchMin]').forEach(i => (i.disabled = viewer()));
   $('#sm-save').textContent = h ? `Salvează în ${h.name}` : 'Salvează în fișier';
   $('#sm-list').innerHTML = Object.values(store.sessions).sort((a, b) => (b.updated || 0) - (a.updated || 0)).map(s => `
     <div class="sess${s.id === state.id ? ' on' : ''}">
@@ -887,13 +893,18 @@ smDlg.addEventListener('click', async e => {
   if (!act) return;
   if (act === 'save' || act === 'save-as') { await saveSession(act === 'save-as'); return fillMenu(); }
   if (act === 'live-on') {
+    if (!(await ensureOrganizer())) return fillMenu();
     const sid = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(36).padStart(2, '0')).join('');
-    state.live = sid;
+    // întâi proprietarul: regulile lasă doar contul organizatorului să creeze sesiunea și apoi să-i scrie echipele
+    try { await fb.set(fb.ref(fb.db, `live/${sid}/owner`), fb.me); }
+    catch { toast('Contul acesta nu poate porni sesiuni live.'); return fillMenu(); }
+    Object.assign(state, { live: sid, mine: true });
     persist();
     if (await connect(sid, true)) shareLink();
     else { state.live = null; persist(); }
     return fillMenu();
   }
+  if (act === 'logout') { await fb.auth.signOut(fb.au); fb.me = null; toast('Ai ieșit din contul de organizator.'); return fillMenu(); }
   if (act === 'live-share') return shareLink();
   if (act === 'live-off') {
     if (!confirm('Sesiunea rămâne pe acest dispozitiv, dar nu se mai sincronizează. Continui?')) return;
@@ -941,11 +952,23 @@ const FB_CONFIG = {
   databaseURL: 'https://sintetic-pizdos-default-rtdb.europe-west1.firebasedatabase.app',
   projectId: 'sintetic-pizdos', appId: '1:448897182271:web:d4cf811e0171a52f3aa68a',
 };
-const LOCAL = ['id', 'updated', 'fileName', 'live'];
+const LOCAL = ['id', 'updated', 'fileName', 'live', 'mine']; // mine = sesiunea live e pornită de mine
 const LOCK_MS = 45000;
 let fb = null, subs = [], synced = {}, ready = false, online = false, offset = 0, stale = false;
 let goalLock = null, myLock = 0; // lacătul de pe server; până când îl țin eu (ora serverului)
 const now = () => Date.now() + offset; // ora serverului, ca cronometrul să arate la fel pe toate telefoanele
+const viewer = () => !!state?.live && !state.mine;
+// Spectatorul a schimbat ceva în afară de goluri și cronometru? Serverul ar refuza, deci revenim la ce e pe server.
+function forbidden() {
+  if (!viewer() || !ready) return false;
+  const next = flat(state);
+  return Object.keys({ ...next, ...synced }).some(k => next[k] !== synced[k] && k !== 'timer' && !k.startsWith('goals/'));
+}
+function revert() {
+  Object.assign(state, fromLive(synced));
+  normalize(state);
+  toast('Doar organizatorul modifică echipele și jucătorii.');
+}
 const lockedByOther = () => !!(state?.live && goalLock && goalLock.by !== fb?.me && goalLock.until > now());
 
 // chei sortate: același conținut dă același text pe orice telefon, deci diferența arată doar schimbările reale
@@ -1030,18 +1053,43 @@ function pull(sid, val) {
 ['focusout', 'pointerup'].forEach(ev => document.addEventListener(ev, () => { if (stale && !drag) render(); }));
 
 // Firebase se încarcă doar pentru sesiunile live. fresh = sesiunea abia a fost pusă online (serverul e gol).
-async function connect(sid, fresh = false) {
+async function loadFb() {
+  if (fb) return true;
   try {
-    if (!fb) {
-      const [app, auth, db] = await Promise.all(['app', 'auth', 'database'].map(m => import(`${FB}${m}.js`)));
-      const a = app.initializeApp(FB_CONFIG), au = auth.getAuth(a);
-      await au.authStateReady();
-      if (!au.currentUser) await auth.signInAnonymously(au);
-      fb = { ...db, db: db.getDatabase(a), me: au.currentUser.uid };
-      fb.onValue(fb.ref(fb.db, '.info/serverTimeOffset'), s => (offset = s.val() || 0));
-      fb.onValue(fb.ref(fb.db, '.info/connected'), s => { online = !!s.val(); if (state) render(); if (smDlg.open) fillMenu(); });
-    }
+    const [app, auth, db] = await Promise.all(['app', 'auth', 'database'].map(m => import(`${FB}${m}.js`)));
+    const a = app.initializeApp(FB_CONFIG), au = auth.getAuth(a);
+    await au.authStateReady(); // organizatorul rămâne logat pe dispozitiv; ceilalți primesc un cont anonim
+    if (!au.currentUser) await auth.signInAnonymously(au);
+    fb = { ...db, db: db.getDatabase(a), auth, au, me: au.currentUser.uid };
+    fb.onValue(fb.ref(fb.db, '.info/serverTimeOffset'), s => (offset = s.val() || 0));
+    fb.onValue(fb.ref(fb.db, '.info/connected'), s => { online = !!s.val(); if (state) render(); if (smDlg.open) fillMenu(); });
+    return true;
   } catch { toast('Nu m-am putut conecta la serverul live.'); return false; }
+}
+
+// Doar organizatorul pornește sesiuni live: username + parolă (contul e făcut în consola Firebase).
+// Username-ul devine o adresă internă, care nu trebuie să existe.
+const loginDlg = $('#login');
+async function ensureOrganizer() {
+  if (!(await loadFb())) return false;
+  if (!fb.au.currentUser?.isAnonymous && fb.au.currentUser) return true;
+  const f = loginDlg.querySelector('form');
+  f.reset();
+  loginDlg.showModal();
+  await new Promise(r => loginDlg.addEventListener('close', r, { once: true }));
+  if (loginDlg.returnValue !== 'ok') return false;
+  const u = f.elements.user.value.trim().toLowerCase(), email = u.includes('@') ? u : `${u}@sintetic-pizdos.app`;
+  try {
+    const { user } = await fb.auth.signInWithEmailAndPassword(fb.au, email, f.elements.pass.value);
+    fb.me = user.uid;
+    return true;
+  } catch { toast('Username sau parolă greșite.'); return false; }
+  finally { f.elements.pass.value = ''; }
+}
+
+async function connect(sid, fresh = false) {
+  if (!(await loadFb())) return false;
+  if (!fb.au.currentUser) { await fb.auth.signInAnonymously(fb.au); fb.me = fb.au.currentUser.uid; } // după „Ieși din cont”
   if (state?.live !== sid) return false;
   subs.forEach(u => u());
   synced = {}; ready = fresh; goalLock = null;
@@ -1049,6 +1097,11 @@ async function connect(sid, fresh = false) {
   subs = [
     fb.onValue(fb.ref(fb.db, `live/${sid}/d`), s => pull(sid, s.val())),
     fb.onValue(fb.ref(fb.db, `live/${sid}/lock`), s => { goalLock = s.val(); tick(); }),
+    fb.onValue(fb.ref(fb.db, `live/${sid}/owner`), s => { // cine e organizatorul o spune serverul
+      if (state?.live !== sid || !s.exists()) return;
+      const mine = s.val() === fb.me;
+      if (mine !== !!state.mine) { state.mine = mine; persist(); render(); }
+    }),
   ];
   return true;
 }

@@ -380,3 +380,10 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 .live-dot.off { color: var(--muted); }
 .goal-btn:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.6); }
 .lock-left { color: var(--text, inherit); font-weight: 600; }
+
+/* spectator în sesiunea live: vede echipele, poate doar goluri și cronometru */
+.viewer #add, .viewer #import, .viewer #export, .viewer #size, .viewer #new-game,
+.viewer .forms, .viewer #bench button, .viewer [data-act=clear], .viewer [data-act=replace] { display: none; }
+.viewer .team-name, .viewer .swatch { pointer-events: none; }
+.viewer .chip, .viewer .token { cursor: default; }
+#login .field { width: 100%; margin-bottom: 8px; }

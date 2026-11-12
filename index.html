@@ -129,6 +129,16 @@
   </dialog>
   <input type="file" id="session-file" hidden>
 
+  <dialog id="login">
+    <form method="dialog">
+      <h2>Organizator</h2>
+      <p class="hint">Doar organizatorul pune sesiuni online. Te loghezi o singură dată pe acest dispozitiv.</p>
+      <input class="field" name="user" placeholder="Username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      <input class="field" type="password" name="pass" placeholder="Parolă" autocomplete="current-password" required>
+      <menu><span class="spacer"></span><button value="cancel" formnovalidate>Anulează</button><button value="ok" class="primary">Intră</button></menu>
+    </form>
+  </dialog>
+
   <dialog id="goal">
     <form method="dialog">
       <h2>⚽ Cine a dat gol?</h2>
