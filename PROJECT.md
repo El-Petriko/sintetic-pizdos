@@ -83,13 +83,17 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 - Lacăt la gol (2026-11-12): `live/<sid>/lock = {by: uid anonim, until}`, luat prin tranzacție, 45 s. Ceilalți au butonul dezactivat
   („⏳ Gol în curs · 0:38”); cel care îl ține vede „Mai ai 0:38”, iar la expirare dialogul se închide. Se eliberează la închiderea dialogului.
   Fără semnal golul se înregistrează local, fără lacăt.
+- Organizator (2026-11-12): doar contul El-Petriko (email/parolă Firebase, UID `rYXL1ZGGjdhs39mDCvVXd1IIzKs1`) pornește sesiuni live;
+  username-ul devine `<username>@sintetic-pizdos.app`. Ceilalți sunt anonimi și spectatori: pot doar goluri, cronometru și lacăt
+  (regulile din `database.rules.json`, lipite de mână în consolă). În aplicație: `state.mine` (local), `forbidden()`/`revert()` în `save()`,
+  clasa `viewer` ascunde butoanele de editare. Sesiunile live mai vechi, fără `owner`, nu mai pot fi scrise.
 - Test live: două origini (`localhost:8080` și `:8081`, configurația `sintetic-pizdos-2` din `.claude/launch.json`) = două „telefoane”.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
 - PWA (manifest, offline), dacă e nevoie.
-- **Următorul:** test live pe 2 telefoane reale, pe Pages (după push). De urmărit: lacătul, cronometrul pe ora serverului, revenirea după fără semnal.
+- **Următorul:** test pe telefon: login organizator, spectator (goluri, cronometru, fără mutări), lacătul; test live pe 2 telefoane reale, pe Pages (după push). De urmărit: lacătul, cronometrul pe ora serverului, revenirea după fără semnal.
 - Live, mai târziu: link de organizator vs. link de bancă; ștergerea automată a sesiunilor vechi de pe server (acum rămân în `live/`).
 - Apoi: buton „Distribuie” cu link static/imagine (opțional, live-ul îl acoperă).
 - Idei: oră/teren deja în sesiune; rotația echipelor; scor.
