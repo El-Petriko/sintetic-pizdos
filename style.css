@@ -273,3 +273,8 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   font-size: 14px; font-weight: 600; box-shadow: 0 12px 30px #000a; transition: opacity .2s, translate .2s;
 }
 .toast.show { opacity: 1; translate: -50% 0; }
+.update {
+  position: fixed; top: 12px; left: 50%; translate: -50% 0; z-index: 150;
+  box-shadow: 0 12px 30px #000a; animation: pop .25s ease-out;
+}
+.update[hidden] { display: none; }

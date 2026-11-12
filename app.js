@@ -455,4 +455,28 @@ dlg.addEventListener('close', () => {
   });
 });
 
+/* ---------- versiune nouă pe server ---------- */
+// GitHub Pages lasă browserul să țină fișierele ~10 min. Comparăm copia din cache cu cea de pe server
+// și, dacă diferă, oferim actualizarea: cache: 'reload' rescrie cache-ul, apoi reîncărcăm pagina.
+const FILES = ['./', 'style.css', 'app.js'];
+async function checkUpdate() {
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
+  try {
+    const changed = await Promise.all(FILES.map(async f => {
+      const [old, now] = await Promise.all([
+        fetch(f, { cache: 'force-cache' }).then(r => r.text()),
+        fetch(f, { cache: 'no-store' }).then(r => r.text()),
+      ]);
+      return old !== now;
+    }));
+    if (changed.some(Boolean)) $('#update').hidden = false;
+  } catch {} // fără internet: rămâne versiunea curentă
+}
+$('#update').addEventListener('click', async () => {
+  await Promise.all(FILES.map(f => fetch(f, { cache: 'reload' }).catch(() => {})));
+  location.reload();
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+checkUpdate();
+
 render();
