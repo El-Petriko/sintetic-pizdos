@@ -26,7 +26,9 @@ Terenul e SVG, drag & drop-ul folosește Pointer Events (merg și pe touch, util
 Pozele se micșorează la ~128px în browser înainte de salvare.
 
 ## Cum se rulează
-`python3 -m http.server 8080` în `projects/fotbal-sintetic/`, apoi http://localhost:8080
+- Local: `python3 -m http.server 8080` în `projects/fotbal-sintetic/`, apoi http://localhost:8080
+- Online: https://el-petriko.github.io/sintetic/ (GitHub Pages din `main`, se actualizează la fiecare push)
+- Repo: https://github.com/El-Petriko/sintetic (public). Push-ul folosește un helper local cu tokenul contului El-Petriko.
 
 ## Plan
 Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, pe aceleași 3 fișiere.
@@ -52,5 +54,6 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
-- Următorul: layout de telefon.
+- Următorul: layout de telefon (+ PWA: manifest, service worker pentru offline).
+- Apoi: buton „Distribuie” (link/imagine cu echipele, varianta A).
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.
