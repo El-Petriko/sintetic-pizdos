@@ -91,6 +91,10 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   Calculul e în mutația din `commit()` (rulează amânat, după animație). Spectatorii pot scrie și `game`/`playing` pentru rotație.
   Cronometru: `timer = {startedAt, acc, pauseUntil, at}`; pauza se alege din 15/30/45/60 s și se termină singură
   (`resumeAt()`, fără scriere); cooldown 5 s după orice apăsare, pentru toți (`at`). Pe telefon GOL și cronometrul sunt mari, unul lângă altul.
+- Final de timp (2026-11-12): rotație ca la 2 goluri (`endByTime()`): pierde cine are mai puține goluri; la egal iese echipa
+  pe teren de mai mult timp (`since[echipă]` = meciul în care a intrat; la primul meci iese prima echipă). Cronometrul rămâne oprit
+  la 7:00 până îl pornește cineva; atingerea pe alarmă doar o oprește. Telefoanele care primesc rotația de la altul sună și ele.
+  Alarmă scurtă (o repriză) când timpul trece de 1:00.
 - Încheiere live (organizator): „Încheie live pentru toți” șterge `live/<sid>`; ceilalți văd nodul gol și rămân cu copia locală.
 - Panou organizator (🛡 în antet, ascuns spectatorilor): istoric local (`state.history`, ultimele 25 de „poze” ale meciului:
   goluri, meci, cine joacă, locuri, cronometru) cu „Readu aici”; timp rămas ±10 s / ±1 min; permisiuni `live/<sid>/perm`
