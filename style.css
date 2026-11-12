@@ -112,7 +112,9 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .half.over { background: color-mix(in srgb, var(--team) 14%, transparent); }
 
 .token {
-  position: absolute; translate: -50% -50%; left: calc(var(--x) * 100%); top: calc(var(--y) * 100%); display: flex; flex-direction: column; align-items: center; gap: 4px;
+  /* --px = x cu margine la capete (11% spre poartă, 3% spre mijloc), ca portarul să stea în teren; inversul e în pitchPoint() */
+  --px: calc(.11 + var(--x) * .86);
+  position: absolute; translate: -50% -50%; left: calc(var(--px) * 100%); top: calc(var(--y) * 100%); display: flex; flex-direction: column; align-items: center; gap: 4px;
   cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .token .disc {
@@ -126,7 +128,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
   font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
   background: #0b120ecc; color: var(--text);
 }
-[data-pitch="R"] .token { left: calc((1 - var(--x)) * 100%); }
+[data-pitch="R"] .token { left: calc((1 - var(--px)) * 100%); }
 .token.empty { cursor: default; }
 .token.empty .disc { background: #ffffff10; border-style: dashed; border-color: #ffffff70; box-shadow: none; }
 .token.empty .tname { background: none; color: #ffffffa0; font-weight: 600; }
@@ -243,9 +245,8 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   #halves { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
   [data-pitch="R"] { grid-row: 1; }
   [data-pitch="L"] { grid-row: 2; }
-  /* x pe verticală cu margine de 7% la capete (x' = .07 + .9x), ca portarul să nu intre sub linia porții; inversul e în pitchPoint() */
-  [data-pitch="L"] .token { left: calc(var(--y) * 100%); top: calc((.93 - var(--x) * .9) * 100%); flex-direction: column-reverse; }
-  [data-pitch="R"] .token { left: calc((1 - var(--y)) * 100%); top: calc((.07 + var(--x) * .9) * 100%); }
+  [data-pitch="L"] .token { left: calc(var(--y) * 100%); top: calc((1 - var(--px)) * 100%); flex-direction: column-reverse; }
+  [data-pitch="R"] .token { left: calc((1 - var(--y)) * 100%); top: calc(var(--px) * 100%); }
 
   .token .disc { width: 44px; height: 44px; border-width: 2.5px; }
   .token .av { font-size: 14px; }

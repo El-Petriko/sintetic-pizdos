@@ -227,8 +227,8 @@ const VERTICAL = matchMedia('(max-width: 700px)');
 function pitchPoint(zoneEl, cx, cy) {
   const r = zoneEl.getBoundingClientRect(), fx = (cx - r.left) / r.width, fy = (cy - r.top) / r.height;
   const L = zoneEl.dataset.pitch === 'L';
-  const [x, y] = VERTICAL.matches ? (L ? [(.93 - fy) / .9, fx] : [(fy - .07) / .9, 1 - fx]) : (L ? [fx, fy] : [1 - fx, fy]);
-  return { x: clamp(x, .06, .95), y: clamp(y, .08, .92) };
+  const [px, y] = VERTICAL.matches ? (L ? [1 - fy, fx] : [fy, 1 - fx]) : (L ? [fx, fy] : [1 - fx, fy]);
+  return { x: clamp((px - .11) / .86, 0, 1), y: clamp(y, .08, .92) }; // inversul lui --px din CSS
 }
 
 // Mută jucătorul acolo unde a fost lăsat (drag) sau unde s-a atins (selecție). Doar mută starea, fără render.
