@@ -9,12 +9,12 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand"><span class="ball">⚽</span> Sintetic</div>
+    <div class="brand"><span class="ball">⚽</span><span class="brand-name"> Sintetic</span></div>
+    <button class="session-btn" id="session" title="Sesiunea: detalii, salvare, sesiune nouă"><b id="s-name"></b><small id="s-meta"></small></button>
     <div class="seg" id="size" role="radiogroup" aria-label="Jucători pe echipă">
       <button data-size="5">5 × 5</button>
       <button data-size="6">6 × 6</button>
     </div>
-    <button class="ghost-btn" id="clear">Golește echipele</button>
   </header>
 
   <div class="layout">
@@ -65,6 +65,58 @@
   <div class="toast" id="toast" role="status"></div>
   <button class="update primary" id="update" hidden>Versiune nouă · Actualizează</button>
 
+  <!-- sesiune nouă (și ecranul de start, când dispozitivul nu are nicio sesiune) -->
+  <dialog id="new-session">
+    <form method="dialog">
+      <h2 id="ns-title">Sesiune nouă de sintetic</h2>
+      <p class="hint" id="ns-hint"></p>
+      <label class="lbl">Nume<input class="field" name="name" maxlength="40" required placeholder="ex. Sintetic de joi"></label>
+      <div class="row">
+        <label class="lbl">Data<input class="field" type="date" name="date" required></label>
+        <label class="lbl">De la<input class="field" type="time" name="start"></label>
+        <label class="lbl">Până la<input class="field" type="time" name="end"></label>
+      </div>
+      <label class="lbl">Teren<input class="field" name="venue" maxlength="40" placeholder="ex. Terenul Verde"></label>
+      <div class="seg" role="radiogroup" aria-label="Jucători pe echipă">
+        <label><input type="radio" name="size" value="5" checked><span>5 × 5</span></label>
+        <label><input type="radio" name="size" value="6"><span>6 × 6</span></label>
+      </div>
+      <label class="check" id="ns-keep"><input type="checkbox" name="keep" checked> Păstrează jucătorii din sesiunea curentă</label>
+      <menu>
+        <button value="import" formnovalidate class="ghost-btn">Importă din fișier</button>
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate id="ns-cancel">Anulează</button>
+        <button value="ok" class="primary">Creează</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="session-menu">
+    <form method="dialog">
+      <h2>Sesiunea</h2>
+      <label class="lbl">Nume<input class="field" name="name" maxlength="40"></label>
+      <div class="row">
+        <label class="lbl">Data<input class="field" type="date" name="date"></label>
+        <label class="lbl">De la<input class="field" type="time" name="start"></label>
+        <label class="lbl">Până la<input class="field" type="time" name="end"></label>
+      </div>
+      <label class="lbl">Teren<input class="field" name="venue" maxlength="40"></label>
+      <p class="hint" id="sm-file"></p>
+      <div class="actions">
+        <button type="button" class="primary" data-act="save" id="sm-save">Salvează în fișier</button>
+        <button type="button" class="ghost-btn" data-act="save-as">Salvează ca fișier nou</button>
+        <button type="button" class="ghost-btn" data-act="import">Importă sesiune</button>
+        <button type="button" class="ghost-btn" data-act="new">Sesiune nouă</button>
+        <button type="button" class="ghost-btn" data-act="replace">Înlocuiește cu una nouă</button>
+        <button type="button" class="ghost-btn" data-act="clear">Golește echipele</button>
+      </div>
+      <h3>Salvate pe acest dispozitiv</h3>
+      <div class="sessions" id="sm-list"></div>
+      <menu><span class="spacer"></span><button value="close">Închide</button></menu>
+    </form>
+  </dialog>
+  <input type="file" id="session-file" accept=".json,application/json" hidden>
+
   <dialog id="editor">
     <form method="dialog">
       <h2 id="editor-title">Jucător nou</h2>
@@ -74,6 +126,7 @@
         <small>Alege poza</small>
       </label>
       <input name="name" id="name" required maxlength="24" placeholder="Nume" autocomplete="off">
+      <input id="role" class="field" maxlength="3" placeholder="Poziție exactă, opțional (LW, ST, GK…)" autocomplete="off">
       <div class="seg pos-pick" role="radiogroup" aria-label="Poziție preferată">
         <label><input type="radio" name="pos" value="P"><span>Portar</span></label>
         <label><input type="radio" name="pos" value="F"><span>Fundaș</span></label>

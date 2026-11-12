@@ -60,6 +60,12 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 - Portari în teren (2026-11-12): `--px = .11 + .86x` pe ambele orientări (CSS), inversul în `pitchPoint()`.
 - Actualizare (2026-11-12): Pages ține fișierele ~10 min în cache; `checkUpdate()` compară cache cu serverul la deschidere
   și la revenirea în tab, apoi oferă butonul „Versiune nouă · Actualizează” (`fetch cache:'reload'` + reload).
+- Sesiuni (2026-11-12): localStorage `sintetic-v2` = `{current, sessions}`; datele vechi (`fotbal-sintetic-v1`) devin „Sesiune salvată”.
+  Fără sesiuni → ecran de start (nouă / import). Meniul din antet: detalii, salvare (suprascrie pe Chrome desktop prin
+  File System Access, altfel descarcă), salvare ca fișier nou, import, nouă (opțional cu jucătorii), înlocuire, listă, ștergere.
+  Formatul e în README.md. Poziții exacte (LW, ST…) pe jucători (`role`), încadrate automat în P/F/M/A.
+- Fișierul pentru 2026-11-12 (Terenul Verde, 18–20, 15 jucători) e în `~/Desktop/sintetic-2026-11-12.json`, nu în repo (nume reale).
+- Teste în pane-ul ascuns: și evenimentul `close` al dialogurilor așteaptă randarea; un screenshot mic între pași îl declanșează.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
@@ -67,4 +73,5 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 - Feedback pe telefonul real după reparații (drag ținut apăsat, scroll; captura din 12:33 era versiunea veche din cache).
 - PWA (manifest, offline), dacă e nevoie.
 - Apoi: buton „Distribuie” (link/imagine cu echipele, varianta A).
+- Idei: oră/teren deja în sesiune; rotația echipelor; scor.
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.

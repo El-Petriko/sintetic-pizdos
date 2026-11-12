@@ -1,32 +1,42 @@
 const KEY = 'fotbal-sintetic-v1';
 const POS_ORDER = 'PFMA';
 const ROLE = { P: 'Portar', F: 'Fundaș', M: 'Mijlocaș', A: 'Atacant' };
+// Poziții exacte (opționale pe jucător) și categoria în care intră
+const CODES = {
+  GK: 'P', CB: 'F', LB: 'F', RB: 'F', LWB: 'F', RWB: 'F', SW: 'F',
+  CM: 'M', CDM: 'M', DM: 'M', CAM: 'M', AM: 'M', LM: 'M', RM: 'M',
+  ST: 'A', CF: 'A', LW: 'A', RW: 'A', FW: 'A',
+};
+const code = v => { const u = typeof v === 'string' ? v.trim().toUpperCase() : ''; return CODES[u] ? u : ''; };
+// P/F/M/A, un cod (LW, GK…) sau cuvântul întreg („Fundaș”) → P/F/M/A
+function posOf(v) {
+  const u = typeof v === 'string' ? v.trim().toUpperCase() : '';
+  if (CODES[u]) return CODES[u];
+  if (u.length === 1 || u.length > 3) return POS_ORDER.includes(u[0]) ? u[0] : null;
+  return null;
+}
+const badge = p => `<span class="pos pos-${p.pos}">${p.role || p.pos}</span>`;
 const FORMATIONS = { 5: ['2-2', '1-2-1', '2-1-1', '3-1'], 6: ['2-2-1', '2-1-2', '3-1-1', '1-3-1'] };
 const uid = () => Math.random().toString(36).slice(2, 10); // randomUUID cere HTTPS, pe telefon în LAN nu avem
 const esc = s => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-const defaultState = () => ({
-  size: 5,
-  players: [],
-  playing: ['t1', 't2'],
-  teams: [
-    { id: 't1', name: 'Echipa 1', color: '#e63946' },
-    { id: 't2', name: 'Echipa 2', color: '#3a86ff' },
-    { id: 't3', name: 'Echipa 3', color: '#ffbe0b' },
-  ],
+const COLORS = ['#e63946', '#3a86ff', '#ffbe0b'];
+const today = () => new Date().toISOString().slice(0, 10);
+
+// O sesiune de sintetic = un meci (dată, oră, teren) cu jucătorii și echipele lui.
+const blankSession = (meta = {}, size = 5) => normalize({
+  id: uid(), name: 'Sintetic', date: today(), start: '', end: '', venue: '', ...meta,
+  size, players: [], playing: ['t1', 't2'],
+  teams: COLORS.map((color, i) => ({ id: `t${i + 1}`, name: `Echipa ${i + 1}`, color })),
 });
 
 // Echipa are `size` locuri fixe (slots[i] = id jucător sau null); locul i = poziția i din formație (0 = portar).
 // custom[i] = poziție mutată de mână, {x, y} în jumătatea proprie (x: 0 = poarta proprie, 1 = mijlocul terenului).
 const fit = (t, n) => { t.slots.length = n; t.slots = Array.from(t.slots, x => x ?? null); };
 
-let state = load();
-function load() {
-  let s;
-  try { s = JSON.parse(localStorage.getItem(KEY)); } catch {}
-  s ||= defaultState();
+function normalize(s) {
   s.playing ||= ['t1', 't2'];
   for (const t of s.teams) {
     t.slots ||= t.members || []; delete t.members; // migrare din prima versiune
@@ -35,8 +45,33 @@ function load() {
   }
   return s;
 }
+
+// Toate sesiunile de pe dispozitiv: { current: id, sessions: { id: sesiune } }
+const STORE = 'sintetic-v2';
+let store = loadStore();
+let state = store.sessions[store.current] || null;
+
+function loadStore() {
+  let st;
+  try { st = JSON.parse(localStorage.getItem(STORE)); } catch {}
+  if (!st) {
+    st = { current: null, sessions: {} };
+    let old; // datele din versiunea fără sesiuni devin o sesiune
+    try { old = JSON.parse(localStorage.getItem(KEY)); } catch {}
+    if (old) {
+      const s = normalize({ id: uid(), name: 'Sesiune salvată', date: today(), start: '', end: '', venue: '', ...old });
+      st.sessions[s.id] = s;
+      st.current = s.id;
+    }
+  }
+  Object.values(st.sessions).forEach(normalize);
+  return st;
+}
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
+  state.updated = Date.now();
+  store.sessions[state.id] = state;
+  store.current = state.id;
+  try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
 }
 
 const player = id => state.players.find(p => p.id === id);
@@ -78,7 +113,7 @@ function short(p) {
 // role = postul locului din echipă (în carduri); lipsă în lista generală
 function chip(p, slot = '', role = '') {
   return `<div class="chip" tabindex="0" data-id="${p.id}" ${slot !== '' ? `data-slot="${slot}"` : ''} style="view-transition-name:p-${p.id}">
-    ${role ? `<span class="role${role !== p.pos ? ' off' : ''}" title="Joacă ${ROLE[role].toLowerCase()}">${role}</span>` : ''}${avatar(p)}<span class="name">${esc(p.name)}</span><span class="pos pos-${p.pos}">${p.pos}</span>
+    ${role ? `<span class="role${role !== p.pos ? ' off' : ''}" title="Joacă ${ROLE[role].toLowerCase()}">${role}</span>` : ''}${avatar(p)}<span class="name">${esc(p.name)}</span>${badge(p)}
   </div>`;
 }
 
@@ -90,14 +125,20 @@ function half(t, side) {
     const p = id && player(id);
     return p
       ? `<div class="token" data-id="${p.id}" data-slot="${i}" title="${esc(p.name)} · ${ROLE[p.pos]}" style="${at};view-transition-name:k-${p.id}">
-          <div class="disc">${avatar(p)}<span class="pos pos-${p.pos}">${p.pos}</span></div><span class="tname">${esc(short(p))}</span></div>`
+          <div class="disc">${avatar(p)}${badge(p)}</div><span class="tname">${esc(short(p))}</span></div>`
       : `<div class="token empty" data-slot="${i}" style="${at}">
           <div class="disc"></div><span class="tname">${ROLE[sp[i].role]}</span></div>`;
   }).join('');
   return `<div class="half" data-zone="${t.id}" data-pitch="${side}" style="--team:${t.color}">${tokens}</div>`;
 }
 
+const fmtDate = d => d ? new Date(d + 'T12:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+const when = s => [fmtDate(s.date), [s.start, s.end].filter(Boolean).join('–')].filter(Boolean).join(', ');
+
 function render() {
+  $('#s-name').textContent = state.name;
+  $('#s-meta').textContent = [when(state), state.venue].filter(Boolean).join(' · ');
+  document.title = `${state.name} · Sintetic`;
   document.querySelectorAll('#size button').forEach(b => b.classList.toggle('on', +b.dataset.size === state.size));
 
   // teren: playing[0] în stânga, playing[1] în dreapta, a treia echipă pe margine
@@ -316,9 +357,6 @@ $('#size').addEventListener('click', e => {
   const n = +e.target.dataset.size;
   if (n && n !== state.size) commit(() => { state.size = n; state.teams.forEach(t => { fit(t, n); t.custom = {}; }); });
 });
-$('#clear').addEventListener('click', () => {
-  if (confirm('Toți jucătorii revin în listă. Continui?')) commit(() => state.teams.forEach(t => { t.slots.fill(null); t.custom = {}; }));
-});
 $('#bench').addEventListener('click', e => {
   const out = e.target.dataset.swap;
   if (!out) return;
@@ -358,15 +396,19 @@ function toast(msg) {
 function cleanPlayer(p) {
   const name = typeof p?.name === 'string' ? p.name.trim().slice(0, 24) : '';
   if (!name) return null;
-  const k = typeof p.pos === 'string' ? p.pos.trim()[0]?.toUpperCase() : '';
-  const pos = k && POS_ORDER.includes(k) ? k : 'M';
-  const ok = typeof p.photo === 'string' && p.photo.length < 300000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(p.photo);
-  return ok ? { name, pos, photo: p.photo } : { name, pos };
+  const role = code(p.role) || code(p.pos);
+  const pos = posOf(p.pos) || (role && CODES[role]) || 'M';
+  const out = { name, pos };
+  if (role && CODES[role] === pos) out.role = role;
+  if (typeof p.photo === 'string' && p.photo.length < 300000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(p.photo)) out.photo = p.photo;
+  return out;
 }
+
+const exportPlayer = ({ id, name, pos, role, photo }) => ({ id, name, pos, ...(role && { role }), ...(photo && { photo }) });
 
 $('#export').addEventListener('click', () => {
   if (!state.players.length) return toast('Nu ai jucători de exportat.');
-  const data = { format: FORMAT, version: 1, players: state.players.map(({ name, pos, photo }) => photo ? { name, pos, photo } : { name, pos }) };
+  const data = { format: FORMAT, version: 1, players: state.players.map(exportPlayer) };
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
   a.download = `jucatori-${new Date().toISOString().slice(0, 10)}.json`;
@@ -415,6 +457,7 @@ function openEditor(id) {
   $('#editor-title').textContent = editing ? 'Editează jucător' : 'Jucător nou';
   $('#name').value = editing?.name || '';
   dlg.querySelector(`[name=pos][value=${editing?.pos || 'M'}]`).checked = true;
+  $('#role').value = editing?.role || '';
   $('#delete').hidden = !editing;
   preview();
   dlg.showModal();
@@ -422,6 +465,10 @@ function openEditor(id) {
 
 $('#add').addEventListener('click', () => openEditor(null));
 $('#name').addEventListener('input', () => { if (!photo) preview(); });
+$('#role').addEventListener('input', e => { // codul alege singur categoria (LW → Atacant)
+  const c = code(e.target.value);
+  if (c) dlg.querySelector(`[name=pos][value=${CODES[c]}]`).checked = true;
+});
 $('#photo').addEventListener('change', async e => {
   const f = e.target.files[0];
   e.target.value = '';
@@ -443,16 +490,225 @@ dlg.addEventListener('close', () => {
   dlg.returnValue = '';
   const name = $('#name').value.trim();
   const pos = dlg.querySelector('[name=pos]:checked').value;
+  const c = code($('#role').value), role = c && CODES[c] === pos ? c : undefined; // cod care nu se potrivește cu categoria: renunțăm la el
 
   if (action === 'ok' && name) commit(() => {
-    if (editing) Object.assign(editing, { name, pos, photo });
-    else state.players.push({ id: uid(), name, pos, photo });
+    if (editing) Object.assign(editing, { name, pos, photo, role });
+    else state.players.push({ id: uid(), name, pos, photo, role });
   });
   const id = editing?.id;
   if (action === 'delete' && id && confirm(`Ștergi pe ${editing.name}?`)) commit(() => {
     move(id, null);
     state.players = state.players.filter(p => p.id !== id);
   });
+});
+
+/* ---------- sesiuni ---------- */
+// Fișier de sesiune: vezi README.md („Format sesiune”). Jucătorii din echipe se pot da prin id sau prin nume.
+const SESSION_FORMAT = 'sintetic-sesiune';
+const handles = {}; // id sesiune → fișierul din care a venit (doar Chrome desktop, cât e deschisă pagina)
+const nsDlg = $('#new-session'), smDlg = $('#session-menu');
+let nsMode = 'new'; // 'start' (nicio sesiune), 'new' (o păstrează pe cea curentă), 'replace'
+
+const str = (v, n) => typeof v === 'string' ? v.trim().slice(0, n) : '';
+const cleanMeta = d => ({
+  name: str(d.name, 40) || 'Sintetic',
+  date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : today(),
+  start: /^\d{2}:\d{2}$/.test(d.start) ? d.start : '',
+  end: /^\d{2}:\d{2}$/.test(d.end) ? d.end : '',
+  venue: str(d.venue, 40),
+});
+
+function sessionToFile(s) {
+  return {
+    format: SESSION_FORMAT, version: 1,
+    name: s.name, date: s.date, start: s.start, end: s.end, venue: s.venue, size: s.size,
+    players: s.players.map(exportPlayer),
+    teams: s.teams.map(t => ({ name: t.name, color: t.color, formation: t.formation || FORMATIONS[s.size][0], slots: t.slots, custom: t.custom })),
+    playing: s.playing.map(id => s.teams.findIndex(t => t.id === id)),
+  };
+}
+
+// Fișierul vine din afară: fiecare câmp e verificat, ce nu se potrivește se ignoră.
+function sessionFromFile(d) {
+  if (d?.format !== SESSION_FORMAT || !Array.isArray(d.players)) throw new Error('format');
+  const s = blankSession(cleanMeta(d), d.size === 6 ? 6 : 5);
+  const ref = new Map(); // id sau nume din fișier → id nou
+  for (const raw of d.players) {
+    const p = cleanPlayer(raw);
+    if (!p) continue;
+    p.id = uid();
+    s.players.push(p);
+    if (typeof raw.id === 'string') ref.set(raw.id, p.id);
+    ref.set(p.name.toLowerCase(), p.id);
+  }
+  const used = new Set();
+  (Array.isArray(d.teams) ? d.teams : []).slice(0, 3).forEach((t, i) => {
+    const dst = s.teams[i];
+    if (str(t?.name, 20)) dst.name = str(t.name, 20);
+    if (/^#[0-9a-f]{6}$/i.test(t?.color)) dst.color = t.color;
+    if (FORMATIONS[s.size].includes(t?.formation)) dst.formation = t.formation;
+    (Array.isArray(t?.slots) ? t.slots : []).slice(0, s.size).forEach((r, j) => {
+      const id = typeof r === 'string' && (ref.get(r) || ref.get(r.trim().toLowerCase()));
+      if (id && !used.has(id)) { dst.slots[j] = id; used.add(id); }
+    });
+    for (const [k, v] of Object.entries(t?.custom && typeof t.custom === 'object' ? t.custom : {}))
+      if (+k >= 0 && +k < s.size && Number.isFinite(v?.x) && Number.isFinite(v?.y)) dst.custom[+k] = { x: clamp(v.x, 0, 1), y: clamp(v.y, 0, 1) };
+  });
+  const pl = Array.isArray(d.playing) ? d.playing.map(i => s.teams[i]?.id) : [];
+  if (pl.length === 2 && pl[0] && pl[1] && pl[0] !== pl[1]) s.playing = pl;
+  return s;
+}
+
+function useSession(s, replace) {
+  if (replace && state) delete store.sessions[state.id];
+  state = s;
+  sel = null;
+  save();
+  if (document.startViewTransition) document.startViewTransition(render).ready.catch(() => {});
+  else render();
+}
+
+const slug = s => (s.name + '-' + s.date).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// Deschide un fișier: pe Chrome desktop cu acces la el (ca să-l putem suprascrie), altfel prin input.
+async function pickFile() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [h] = await showOpenFilePicker({ types: [{ description: 'Sesiune sintetic', accept: { 'application/json': ['.json'] } }] });
+      return { file: await h.getFile(), handle: h };
+    } catch (e) { if (e.name === 'AbortError') return null; }
+  }
+  return new Promise(res => {
+    const i = $('#session-file');
+    i.onchange = () => { const f = i.files[0]; i.value = ''; res(f && { file: f, handle: null }); };
+    i.oncancel = () => res(null);
+    i.click();
+  });
+}
+
+async function importSession(replace) {
+  const picked = await pickFile();
+  if (!picked) return false;
+  let s;
+  try { s = sessionFromFile(JSON.parse(await picked.file.text())); }
+  catch { toast('Fișierul nu e o sesiune de sintetic validă.'); return false; }
+  s.fileName = picked.file.name;
+  if (picked.handle) handles[s.id] = picked.handle;
+  useSession(s, replace);
+  toast(`Sesiune importată: ${s.name} (${s.players.length} jucători).`);
+  return true;
+}
+
+async function writeFile(handle, text) {
+  const w = await handle.createWritable();
+  await w.write(text);
+  await w.close();
+}
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// asNew: fișier nou (alegi unde, sau descărcare); altfel suprascrie fișierul din care a venit sesiunea
+async function saveSession(asNew) {
+  const text = JSON.stringify(sessionToFile(state), null, 2);
+  const h = handles[state.id];
+  try {
+    if (!asNew && h) { await writeFile(h, text); return toast(`Salvat în ${h.name}.`); }
+    if (asNew && window.showSaveFilePicker) {
+      const nh = await showSaveFilePicker({ suggestedName: `${slug(state)}.json`, types: [{ description: 'Sesiune sintetic', accept: { 'application/json': ['.json'] } }] });
+      await writeFile(nh, text);
+      handles[state.id] = nh;
+      state.fileName = nh.name;
+    } else {
+      // fără acces direct la fișiere (ex. telefon): descărcare cu același nume
+      if (asNew || !state.fileName) state.fileName = `${slug(state)}.json`;
+      download(state.fileName, text);
+    }
+    save();
+    toast(`Salvat: ${state.fileName}.`);
+  } catch (e) { if (e.name !== 'AbortError') toast('Nu am putut salva fișierul.'); }
+}
+
+function openNew(mode) {
+  nsMode = mode;
+  const f = nsDlg.querySelector('form');
+  f.reset();
+  f.elements.date.value = today();
+  f.elements.name.value = `Sintetic ${fmtDate(today())}`;
+  $('#ns-title').textContent = mode === 'replace' ? 'Înlocuiește sesiunea' : 'Sesiune nouă de sintetic';
+  $('#ns-hint').textContent = mode === 'start' ? 'Nu ai nicio sesiune pe acest dispozitiv. Creează una sau importă un fișier.'
+    : mode === 'replace' ? `„${state.name}” va fi ștearsă de pe dispozitiv.` : '';
+  $('#ns-keep').hidden = mode === 'start';
+  $('#ns-cancel').hidden = mode === 'start';
+  nsDlg.showModal();
+}
+
+nsDlg.addEventListener('cancel', e => { if (nsMode === 'start') e.preventDefault(); }); // fără sesiune nu ai ce afișa
+nsDlg.addEventListener('close', async () => {
+  const act = nsDlg.returnValue, f = nsDlg.querySelector('form');
+  nsDlg.returnValue = '';
+  const replace = nsMode === 'replace';
+  if (act === 'import') { if (!(await importSession(replace)) && nsMode === 'start') nsDlg.showModal(); return; }
+  if (act !== 'ok') return;
+  const s = blankSession(cleanMeta(Object.fromEntries(new FormData(f))), +f.elements.size.value);
+  if (state && nsMode !== 'start' && f.elements.keep.checked) s.players = structuredClone(state.players);
+  useSession(s, replace);
+});
+
+function fillMenu() {
+  const f = smDlg.querySelector('form');
+  for (const k of ['name', 'date', 'start', 'end', 'venue']) f.elements[k].value = state[k] || '';
+  const h = handles[state.id];
+  $('#sm-file').textContent = h ? `Fișier: ${h.name}` : state.fileName ? `Fișier: ${state.fileName} (pe acest dispozitiv salvarea descarcă o copie nouă)` : 'Sesiunea nu a fost salvată încă într-un fișier.';
+  $('#sm-save').textContent = h ? `Salvează în ${h.name}` : 'Salvează în fișier';
+  $('#sm-list').innerHTML = Object.values(store.sessions).sort((a, b) => (b.updated || 0) - (a.updated || 0)).map(s => `
+    <div class="sess${s.id === state.id ? ' on' : ''}">
+      <span><b>${esc(s.name)}</b><small>${esc([when(s), s.venue, `${s.players.length} jucători`].filter(Boolean).join(' · '))}</small></span>
+      ${s.id === state.id ? '<em>deschisă</em>' : `<button type="button" class="ghost-btn sm" data-open="${s.id}">Deschide</button>`}
+      <button type="button" class="ghost-btn sm danger-x" data-del="${s.id}" aria-label="Șterge sesiunea">✕</button>
+    </div>`).join('');
+}
+const openMenu = () => { fillMenu(); smDlg.showModal(); };
+
+$('#session').addEventListener('click', openMenu);
+smDlg.addEventListener('change', e => { // detaliile se salvează pe loc
+  const k = e.target.name;
+  if (!['name', 'date', 'start', 'end', 'venue'].includes(k)) return;
+  Object.assign(state, { [k]: cleanMeta({ ...state, [k]: e.target.value })[k] });
+  save(); render();
+});
+smDlg.addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.open) { smDlg.close(); return useSession(store.sessions[b.dataset.open]); }
+  if (b.dataset.del) {
+    const s = store.sessions[b.dataset.del];
+    if (!confirm(`Ștergi sesiunea „${s.name}” de pe acest dispozitiv?`)) return;
+    delete store.sessions[s.id];
+    if (s.id === state.id) {
+      smDlg.close();
+      const next = Object.values(store.sessions).sort((a, b) => (b.updated || 0) - (a.updated || 0))[0];
+      if (next) return useSession(next);
+      state = null;
+      localStorage.setItem(STORE, JSON.stringify({ current: null, sessions: {} }));
+      return openNew('start');
+    }
+    save();
+    return fillMenu();
+  }
+  const act = b.dataset.act;
+  if (!act) return;
+  if (act === 'save' || act === 'save-as') { await saveSession(act === 'save-as'); return fillMenu(); }
+  smDlg.close();
+  if (act === 'import') importSession(false);
+  if (act === 'new') openNew('new');
+  if (act === 'replace') openNew('replace');
+  if (act === 'clear' && confirm('Toți jucătorii revin în listă. Continui?')) commit(() => state.teams.forEach(t => { t.slots.fill(null); t.custom = {}; }));
 });
 
 /* ---------- versiune nouă pe server ---------- */
@@ -479,4 +735,4 @@ $('#update').addEventListener('click', async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 checkUpdate();
 
-render();
+if (state) render(); else openNew('start');
