@@ -1,4 +1,4 @@
-# Fotbal sintetic — manager de echipe
+# sintetic-pizdos — manager de echipe pentru fotbal pe sintetic
 
 Start: 2026-11-12 · Sesiuni: `sessions/2026-11-12_01_fotbal-sintetic/`
 
@@ -26,9 +26,9 @@ Terenul e SVG, drag & drop-ul folosește Pointer Events (merg și pe touch, util
 Pozele se micșorează la ~128px în browser înainte de salvare.
 
 ## Cum se rulează
-- Local: `python3 -m http.server 8080` în `projects/fotbal-sintetic/`, apoi http://localhost:8080
-- Online: https://el-petriko.github.io/sintetic/ (GitHub Pages din `main`, se actualizează la fiecare push)
-- Repo: https://github.com/El-Petriko/sintetic (public). Push-ul folosește un helper local cu tokenul contului El-Petriko.
+- Local: `python3 -m http.server 8080` în `projects/sintetic-pizdos/`, apoi http://localhost:8080
+- Online: https://el-petriko.github.io/sintetic-pizdos/ (GitHub Pages din `main`, se actualizează la fiecare push)
+- Repo: https://github.com/El-Petriko/sintetic-pizdos (public; redenumit din `sintetic` pe 2026-11-12, linkul vechi de Pages nu mai merge). Push-ul folosește un helper local cu tokenul contului El-Petriko.
 
 ## Plan
 Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, pe aceleași 3 fișiere.

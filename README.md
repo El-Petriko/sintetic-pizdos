@@ -1,8 +1,8 @@
-# Sintetic
+# sintetic-pizdos
 
 Manager de echipe pentru fotbal pe sintetic: 3 echipe de 5 sau 6 jucători, teren cu formații, drag & drop sau atingere,
 cronometru de meci cu alarmă și înregistrarea golurilor.
-Online: https://el-petriko.github.io/sintetic/
+Online: https://el-petriko.github.io/sintetic-pizdos/
 
 Totul rulează în browser, fără server. Sesiunile stau în browserul dispozitivului (localStorage) și se pot salva în fișiere `.json`.
 
