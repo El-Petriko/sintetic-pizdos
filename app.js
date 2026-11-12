@@ -85,7 +85,7 @@ function persist() {
   try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
 }
 // push: trimite schimbarea în sesiunea live, dacă e cazul. Spectatorul poate schimba doar golurile și cronometrul.
-const save = () => { if (forbidden()) return revert(); persist(); push(); };
+const save = () => { if (forbidden()) return revert(); record('tu'); persist(); push(); };
 
 const player = id => state.players.find(p => p.id === id);
 const team = id => state.teams.find(t => t.id === id);
@@ -533,7 +533,7 @@ const resumeAt = () => state.timer.pauseUntil && now() >= state.timer.pauseUntil
 const elapsed = () => { const t = state.timer, from = t.startedAt ?? resumeAt(); return t.acc + (from ? now() - from : 0); };
 const running = () => !!state && !!(state.timer.startedAt || resumeAt());
 const paused = () => !!state && !running() && !!state.timer.pauseUntil;
-const cooling = () => !!state?.timer.at && now() - state.timer.at < COOLDOWN;
+const cooling = () => viewer() && !!state?.timer.at && now() - state.timer.at < COOLDOWN; // organizatorul nu are cooldown
 const setTimer = o => (state.timer = timer0({ at: now(), ...o }));
 
 function newGame() {
@@ -555,7 +555,9 @@ function tick() {
   $('#timer').title = running() ? 'Pauză' : left === 0 ? 'Resetează cronometrul' : elapsed() ? 'Continuă' : 'Pornește cronometrul';
   // lacătul golului: ceilalți așteaptă, cel care îl ține vede cât mai are
   const other = lockedByOther(), btn = $('#goal-btn');
-  btn.disabled = other;
+  btn.disabled = other || !can('goals');
+  $('#timer').classList.toggle('locked', !can('timer'));
+  if (orgDlg.open) $('#org-clock').textContent = mmss(left);
   btn.textContent = other ? `⏳ Gol în curs · ${mmss(goalLock.until - now())}` : '⚽ GOL';
   if (myLock && goalDlg.open) {
     if (now() >= myLock) { goalDlg.close(); toast('Au trecut 45 de secunde, golul nu s-a înregistrat.'); }
@@ -598,7 +600,7 @@ document.addEventListener('visibilitychange', () => { lock = null; if (!document
 
 function finish() {
   state.timer = timer0({ acc: dur() });
-  save();
+  if (can('timer')) save(); else persist(); // spectator fără drept: doar local, serverul primește varianta organizatorului
   tick();
   keepAwake(false);
   ring(true);
@@ -609,6 +611,7 @@ $('#timer').addEventListener('click', () => {
   audio ||= window.AudioContext && new AudioContext();
   audio?.resume();
   ring(false); // o atingere oprește alarma și în cooldown
+  if (!can('timer')) return toast('Organizatorul a blocat cronometrul.');
   if (cooling()) return toast('Așteaptă câteva secunde: cronometrul tocmai a fost atins.');
   if (running()) return pauseDlg.showModal();                              // pauza are mereu o durată
   if (elapsed() >= dur()) setTimer({ acc: 0 });                            // gata: înapoi la 7:00
@@ -627,6 +630,7 @@ pauseDlg.addEventListener('close', () => {
   save(); tick();
 });
 $('#timer-reset').addEventListener('click', () => {
+  if (!can('timer')) return toast('Organizatorul a blocat cronometrul.');
   if (cooling()) return toast('Așteaptă câteva secunde: cronometrul tocmai a fost atins.');
   if ((running() || paused()) && !confirm('Oprești și resetezi cronometrul?')) return;
   setTimer({});
@@ -640,6 +644,7 @@ $('#new-game').addEventListener('click', () => {
 
 const goalDlg = $('#goal');
 $('#goal-btn').addEventListener('click', async () => {
+  if (!can('goals')) return toast('Organizatorul a blocat golurile.');
   if (!(await takeLock())) return toast('Altcineva înregistrează deja un gol.');
   $('#goal-left').textContent = '';
   const cols = state.playing.map(team).map(t => {
@@ -929,7 +934,7 @@ smDlg.addEventListener('click', async e => {
   if (act === 'save' || act === 'save-as') { await saveSession(act === 'save-as'); return fillMenu(); }
   if (act === 'live-on') {
     if (!(await ensureOrganizer())) return fillMenu();
-    const sid = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(36).padStart(2, '0')).join('');
+    const sid = newSid();
     // întâi proprietarul: regulile lasă doar contul organizatorului să creeze sesiunea și apoi să-i scrie echipele
     try { await fb.set(fb.ref(fb.db, `live/${sid}/owner`), fb.me); }
     catch { toast('Contul acesta nu poate porni sesiuni live.'); return fillMenu(); }
@@ -996,9 +1001,11 @@ const FB_CONFIG = {
   databaseURL: 'https://sintetic-pizdos-default-rtdb.europe-west1.firebasedatabase.app',
   projectId: 'sintetic-pizdos', appId: '1:448897182271:web:d4cf811e0171a52f3aa68a',
 };
-const LOCAL = ['id', 'updated', 'fileName', 'live', 'mine']; // mine = sesiunea live e pornită de mine
+const LOCAL = ['id', 'updated', 'fileName', 'live', 'mine', 'history']; // mine = sesiunea live e pornită de mine
 const LOCK_MS = 45000;
 let fb = null, subs = [], synced = {}, ready = false, online = false, offset = 0, stale = false;
+let perm = { goals: true, timer: true }; // ce pot face spectatorii (le alege organizatorul)
+const can = k => !viewer() || perm[k] !== false;
 let goalLock = null, myLock = 0; // lacătul de pe server; până când îl țin eu (ora serverului)
 const now = () => Date.now() + offset; // ora serverului, ca cronometrul să arate la fel pe toate telefoanele
 const viewer = () => !!state?.live && !state.mine;
@@ -1006,12 +1013,17 @@ const viewer = () => !!state?.live && !state.mine;
 function forbidden() {
   if (!viewer() || !ready) return false;
   const next = flat(state);
-  return Object.keys({ ...next, ...synced }).some(k => next[k] !== synced[k] && !['timer', 'game', 'playing'].includes(k) && !k.startsWith('goals/'));
+  return Object.keys({ ...next, ...synced }).some(k => {
+    if (next[k] === synced[k]) return false;
+    if (k.startsWith('goals/')) return !can('goals') || synced[k] !== undefined; // spectatorul doar adaugă goluri
+    if (k === 'game' || k === 'playing') return !can('goals');                   // rotația vine din goluri
+    return k !== 'timer' || !can('timer');
+  });
 }
 function revert() {
   Object.assign(state, fromLive(synced));
   normalize(state);
-  toast('Doar organizatorul modifică echipele și jucătorii.');
+  toast('Doar organizatorul poate face asta.');
 }
 const lockedByOther = () => !!(state?.live && goalLock && goalLock.by !== fb?.me && goalLock.until > now());
 
@@ -1079,7 +1091,7 @@ function push() {
 function pull(sid, val) {
   if (state?.live !== sid) return;
   if (!val) { // nimic pe server: linkul e greșit sau organizatorul a încheiat live-ul
-    toast(ready ? 'Organizatorul a încheiat sesiunea live. A rămas pe telefonul tău.' : 'Sesiunea live nu mai există.');
+    toast(ready ? 'Sesiunea live s-a încheiat sau are alt link. A rămas pe telefonul tău.' : 'Sesiunea live nu mai există.');
     Object.assign(state, { live: null, mine: false }); persist(); goLive(); render();
     return;
   }
@@ -1090,6 +1102,7 @@ function pull(sid, val) {
   synced = remote;
   Object.assign(state, fromLive(remote));
   normalize(state);
+  if (!first) record('alt telefon');
   persist();
   if (first) toast(`Conectat la „${state.name}”.`);
   // cât tragi un jucător sau scrii într-un câmp, randarea așteaptă (altfel ți-ar fugi elementul de sub deget)
@@ -1142,6 +1155,7 @@ async function connect(sid, fresh = false) {
   subs = [
     fb.onValue(fb.ref(fb.db, `live/${sid}/d`), s => pull(sid, s.val())),
     fb.onValue(fb.ref(fb.db, `live/${sid}/lock`), s => { goalLock = s.val(); tick(); }),
+    fb.onValue(fb.ref(fb.db, `live/${sid}/perm`), s => { perm = { goals: true, timer: true, ...s.val() }; render(); if (orgDlg.open) fillOrg(); }),
     fb.onValue(fb.ref(fb.db, `live/${sid}/owner`), s => { // cine e organizatorul o spune serverul
       if (state?.live !== sid || !s.exists()) return;
       const mine = s.val() === fb.me;
@@ -1154,9 +1168,10 @@ async function connect(sid, fresh = false) {
 function goLive() {
   if (state?.live) return connect(state.live);
   subs.forEach(u => u());
-  subs = []; ready = false; goalLock = null;
+  subs = []; ready = false; goalLock = null; perm = { goals: true, timer: true };
 }
 
+const newSid = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(36).padStart(2, '0')).join('');
 const liveUrl = () => `${location.origin}${location.pathname}#live=${state.live}`;
 function shareLink() {
   const url = liveUrl();
@@ -1183,6 +1198,99 @@ function releaseLock() {
   myLock = 0;
   fb.runTransaction(fb.ref(fb.db, `live/${state.live}/lock`), cur => cur?.by === fb.me ? null : undefined).catch(() => {});
 }
+
+/* ---------- panoul organizatorului ---------- */
+// Istoricul stă doar pe dispozitivul organizatorului (sau local): fiecare schimbare de scor, meci, echipe sau cronometru
+// e o poză a meciului. „Readu aici” pune totul înapoi cum era atunci, deci repară orice abuz dintr-o atingere.
+const HIST = 25;
+const core = x => json({ goals: x.goals, game: x.game, playing: x.playing, slots: x.slots, timer: x.timer });
+let nextLabel = null;
+function describe(a, b) {
+  if (!a) return 'început';
+  const out = [], name = id => player(id)?.name || 'jucător', had = new Set(a.goals.map(g => g.id)), has = new Set(b.goals.map(g => g.id));
+  b.goals.filter(g => !had.has(g.id)).forEach(g => out.push(`⚽ ${name(g.player)}`));
+  a.goals.filter(g => !has.has(g.id)).forEach(g => out.push(`✕ gol ${name(g.player)}`));
+  if (b.game !== a.game) out.push(`meciul ${b.game}`);
+  const inn = b.playing.find(x => !a.playing.includes(x));
+  if (inn) out.push(`intră ${team(inn)?.name}`);
+  if (json(b.slots) !== json(a.slots)) out.push('echipe schimbate');
+  if (b.game === a.game && json(b.timer) !== json(a.timer)) {
+    const t = b.timer;
+    out.push(t.pauseUntil ? `⏸ pauză ${Math.round((t.pauseUntil - (t.at || t.pauseUntil)) / 1000)} s` : t.startedAt ? '▶ cronometru pornit'
+      : !t.acc ? '↺ cronometru resetat' : t.acc >= dur() ? 'timp expirat' : '⏱ cronometru setat');
+  }
+  return out.join(' · ') || 'modificare';
+}
+function record(by) {
+  if (viewer()) return;
+  const h = (state.history ||= []), last = h.at(-1);
+  const snap = JSON.parse(json({ goals: state.goals, game: state.game, playing: state.playing, slots: state.teams.map(t => t.slots), timer: state.timer }));
+  if (last && core(last) === core(snap)) return;
+  h.push({ ...snap, at: now(), by, label: nextLabel || describe(last, snap), el: elapsed(), run: running() });
+  nextLabel = null;
+  if (h.length > HIST) h.splice(0, h.length - HIST);
+}
+
+const orgDlg = $('#org');
+function fillOrg() {
+  const live = !!(state.live && state.mine);
+  $('#org-live').hidden = !live;
+  orgDlg.querySelectorAll('[data-perm]').forEach(i => (i.checked = perm[i.dataset.perm] !== false));
+  $('#org-clock').textContent = mmss(Math.max(0, dur() - elapsed()));
+  const hs = (state.history || []).map((h, i) => [h, i]).reverse();
+  $('#org-hist').innerHTML = hs.length ? hs.map(([h, i], n) => {
+    const [a, b] = h.playing.map(team), sc = t => h.goals.filter(g => g.game === h.game && g.team === t?.id).length;
+    return `<div class="hrow${n ? '' : ' now'}"><span class="ht">${hhmm(h.at)}</span>
+      <span class="hl">${esc(h.label)}<small>${esc(h.by)} · meci ${h.game}: ${esc(a?.name || '')} ${sc(a)}–${sc(b)} ${esc(b?.name || '')} · ${mmss(Math.max(0, dur() - h.el))}</small></span>
+      ${n ? `<button type="button" class="ghost-btn sm" data-restore="${i}">Readu aici</button>` : '<em>acum</em>'}</div>`;
+  }).join('') : '<p class="hint">Nicio schimbare încă.</p>';
+}
+$('#org-btn').addEventListener('click', () => { fillOrg(); orgDlg.showModal(); });
+
+// Timpul rămas, mutat cu ±; cronometrul își păstrează starea (pornit, pauză, oprit).
+function adjust(sec) {
+  const e = clamp(elapsed() - sec * 1000, 0, dur());
+  nextLabel = `⏱ cronometru setat la ${mmss(dur() - e)}`;
+  setTimer({ acc: e, startedAt: running() ? now() : null, pauseUntil: paused() ? state.timer.pauseUntil : null });
+  ring(false);
+  save(); tick(); fillOrg();
+}
+function restore(h) { // fără commit(): animația s-ar desena peste panoul deschis
+  nextLabel = `↩ readus la ${hhmm(h.at)}`;
+  Object.assign(state, JSON.parse(json({ goals: h.goals, game: h.game, playing: h.playing })));
+  h.slots.forEach((sl, i) => { if (state.teams[i]) state.teams[i].slots = [...sl]; });
+  state.timer = timer0({ acc: h.el, startedAt: h.run ? now() : null, at: now() });
+  normalize(state);
+  ring(false);
+  save(); render();
+}
+async function newLink() {
+  if (!confirm('Linkul vechi nu va mai merge. Îl trimiți din nou doar cui vrei. Continui?')) return;
+  const old = state.live, sid = newSid(), keep = { ...perm };
+  try { await fb.set(fb.ref(fb.db, `live/${sid}/owner`), fb.me); }
+  catch { return toast('Nu am putut crea linkul nou.'); }
+  state.live = sid;
+  persist();
+  if (!(await connect(sid, true))) { state.live = old; persist(); goLive(); return; }
+  fb.set(fb.ref(fb.db, `live/${sid}/perm`), keep).catch(() => {});
+  fb.remove(fb.ref(fb.db, `live/${old}`)).catch(() => {});
+  fillOrg();
+  shareLink();
+}
+orgDlg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.adj) return adjust(+b.dataset.adj);
+  if (b.dataset.restore) {
+    const h = state.history[+b.dataset.restore];
+    if (h && confirm(`Readuci meciul cum era la ${hhmm(h.at)}?`)) { restore(h); fillOrg(); }
+  }
+  if (b.dataset.act === 'new-link') newLink();
+});
+orgDlg.addEventListener('change', e => {
+  const k = e.target.dataset.perm;
+  if (k && state.live && state.mine) fb.set(fb.ref(fb.db, `live/${state.live}/perm/${k}`), e.target.checked).catch(() => toast('Nu am putut salva.'));
+});
 
 // Linkul #live=<sid>: deschide sesiunea (sau o creează pe dispozitiv), apoi o umple de pe server.
 addEventListener('hashchange', () => { if (location.hash.includes('live=')) location.reload(); }); // linkul deschis peste aplicație

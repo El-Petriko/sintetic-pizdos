@@ -11,6 +11,7 @@
   <header class="top">
     <div class="brand"><span class="ball">⚽</span><span class="brand-name"> sintetic-pizdos</span></div>
     <button class="session-btn" id="session" title="Sesiunea: detalii, salvare, sesiune nouă"><b id="s-name"></b><small id="s-meta"></small></button>
+    <button class="ghost-btn org-btn" id="org-btn" title="Panou organizator: istoric, cronometru, ce pot face ceilalți">🛡</button>
     <div class="seg" id="size" role="radiogroup" aria-label="Jucători pe echipă">
       <button data-size="5">5 × 5</button>
       <button data-size="6">6 × 6</button>
@@ -136,6 +137,27 @@
       <input class="field" name="user" placeholder="Username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
       <input class="field" type="password" name="pass" placeholder="Parolă" autocomplete="current-password" required>
       <menu><span class="spacer"></span><button value="cancel" formnovalidate>Anulează</button><button value="ok" class="primary">Intră</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="org">
+    <form method="dialog">
+      <h2>🛡 Organizator</h2>
+      <h3>Cronometru · timp rămas</h3>
+      <div class="org-timer">
+        <button type="button" class="ghost-btn" data-adj="-60">−1:00</button><button type="button" class="ghost-btn" data-adj="-10">−0:10</button>
+        <b id="org-clock">7:00</b>
+        <button type="button" class="ghost-btn" data-adj="10">+0:10</button><button type="button" class="ghost-btn" data-adj="60">+1:00</button>
+      </div>
+      <div id="org-live">
+        <h3>Ceilalți pot</h3>
+        <label class="check"><input type="checkbox" data-perm="goals"> înregistra goluri</label>
+        <label class="check"><input type="checkbox" data-perm="timer"> folosi cronometrul</label>
+        <button type="button" class="ghost-btn" data-act="new-link">🔗 Link nou (cel vechi nu mai merge)</button>
+      </div>
+      <h3>Istoric · apasă „Readu aici” ca să anulezi ce a urmat</h3>
+      <div class="org-hist" id="org-hist"></div>
+      <menu><span class="spacer"></span><button value="close">Închide</button></menu>
     </form>
   </dialog>
 

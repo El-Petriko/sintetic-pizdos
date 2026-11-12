@@ -406,3 +406,22 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   #new-game { grid-area: 2 / 2; margin: 0; padding: 10px; }
   .pause-opts { grid-template-columns: 1fr 1fr; }
 }
+
+/* panoul organizatorului */
+.viewer #org-btn { display: none; }
+.org-btn { padding: 6px 10px; font-size: 18px; }
+#org { width: 520px; }
+#org h3 { margin: 14px 0 8px; font-size: 13px; color: var(--muted); }
+.org-timer { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.org-timer b { font-size: 30px; min-width: 90px; text-align: center; font-variant-numeric: tabular-nums; }
+.org-timer button { padding: 10px 8px; font-weight: 700; }
+#org-live:not([hidden]) { display: grid; gap: 6px; }
+.org-hist { display: grid; gap: 6px; max-height: 45vh; overflow: auto; }
+.hrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
+.hrow.now { outline: 1px solid var(--accent); }
+.hrow .ht { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.hrow .hl { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; display: flex; flex-direction: column; }
+.hrow .hl small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.hrow em { color: var(--accent); font-size: 12px; }
+.viewer [data-del-goal] { display: none; }
+.timer.locked { opacity: .45; }
