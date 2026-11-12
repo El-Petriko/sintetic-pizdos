@@ -92,6 +92,10 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   Cronometru: `timer = {startedAt, acc, pauseUntil, at}`; pauza se alege din 15/30/45/60 s și se termină singură
   (`resumeAt()`, fără scriere); cooldown 5 s după orice apăsare, pentru toți (`at`). Pe telefon GOL și cronometrul sunt mari, unul lângă altul.
 - Încheiere live (organizator): „Încheie live pentru toți” șterge `live/<sid>`; ceilalți văd nodul gol și rămân cu copia locală.
+- Panou organizator (🛡 în antet, ascuns spectatorilor): istoric local (`state.history`, ultimele 25 de „poze” ale meciului:
+  goluri, meci, cine joacă, locuri, cronometru) cu „Readu aici”; timp rămas ±10 s / ±1 min; permisiuni `live/<sid>/perm`
+  (`goals`, `timer`, aplicate și în reguli); „Link nou” mută sesiunea pe alt `sid` și o șterge pe cea veche.
+  Spectatorii doar adaugă goluri (nu șterg), iar cooldown-ul de 5 s e doar pentru ei.
 - Test live: două origini (`localhost:8080` și `:8081`, configurația `sintetic-pizdos-2` din `.claude/launch.json`) = două „telefoane”.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
