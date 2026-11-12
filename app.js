@@ -46,9 +46,9 @@ const formationOf = t => FORMATIONS[state.size].includes(t.formation) ? t.format
 
 // "2-1-1" → portarul + liniile, de la apărare la atac
 function spots(f) {
-  const lines = f.split('-').map(Number), out = [{ x: .12, y: .5, role: 'P' }];
+  const lines = f.split('-').map(Number), out = [{ x: .08, y: .5, role: 'P' }];
   lines.forEach((n, i) => {
-    const x = .3 + i * (.52 / (lines.length - 1));
+    const x = .33 + i * (.49 / (lines.length - 1));
     const role = i === lines.length - 1 ? 'A' : i === 0 ? 'F' : 'M';
     for (let j = 0; j < n; j++) out.push({ x, y: (j + 1) / (n + 1), role });
   });
@@ -169,15 +169,33 @@ function move(id, zone, slot) {
 let drag = null;
 const vtName = (el, name) => (el.style.viewTransitionName = name);
 
+// Cu degetul, drag-ul pornește doar după o apăsare scurtă ținută; o mișcare înainte de asta e scroll.
+const HOLD_MS = 250;
+
 document.addEventListener('pointerdown', e => {
   const c = e.target.closest('.chip, .token[data-id]');
   if (!c || e.button !== 0) return;
-  e.preventDefault();
-  drag = { id: c.dataset.id, src: c, x0: e.clientX, y0: e.clientY, ghost: null, zone: null, over: null };
+  const touch = e.pointerType === 'touch';
+  if (!touch) e.preventDefault();
+  drag = { id: c.dataset.id, src: c, x0: e.clientX, y0: e.clientY, ghost: null, zone: null, over: null, armed: !touch };
+  if (touch) drag.timer = setTimeout(() => {
+    if (!drag || drag.src !== c) return;
+    drag.armed = true;
+    c.classList.add('lifted');
+    navigator.vibrate?.(15);
+  }, HOLD_MS);
 });
+
+// după ce jucătorul s-a „ridicat”, oprim scroll-ul cât timp e tras
+document.addEventListener('touchmove', e => { if (drag?.armed) e.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', e => { if (e.target.closest('.chip, .token')) e.preventDefault(); });
 
 document.addEventListener('pointermove', e => {
   if (!drag) return;
+  if (!drag.armed) { // încă nu e ținut destul: dacă degetul se mișcă, e scroll
+    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8) { clearTimeout(drag.timer); drag = null; }
+    return;
+  }
   if (!drag.ghost) {
     if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
     const r = drag.src.getBoundingClientRect();
@@ -209,8 +227,8 @@ const VERTICAL = matchMedia('(max-width: 700px)');
 function pitchPoint(zoneEl, cx, cy) {
   const r = zoneEl.getBoundingClientRect(), fx = (cx - r.left) / r.width, fy = (cy - r.top) / r.height;
   const L = zoneEl.dataset.pitch === 'L';
-  const [x, y] = VERTICAL.matches ? (L ? [1 - fy, fx] : [fy, 1 - fx]) : (L ? [fx, fy] : [1 - fx, fy]);
-  return { x: clamp(x, .1, .95), y: clamp(y, .08, .92) };
+  const [x, y] = VERTICAL.matches ? (L ? [(.93 - fy) / .9, fx] : [(fy - .07) / .9, 1 - fx]) : (L ? [fx, fy] : [1 - fx, fy]);
+  return { x: clamp(x, .06, .95), y: clamp(y, .08, .92) };
 }
 
 // Mută jucătorul acolo unde a fost lăsat (drag) sau unde s-a atins (selecție). Doar mută starea, fără render.
@@ -229,6 +247,8 @@ function place(id, zoneEl, slotEl, cx, cy) {
 document.addEventListener('pointerup', e => {
   if (!drag) return;
   const d = drag; drag = null;
+  clearTimeout(d.timer);
+  d.src.classList.remove('lifted');
   if (!d.ghost) return tapPlayer(d.id);
 
   d.zone?.classList.remove('over');
@@ -245,6 +265,7 @@ document.addEventListener('pointerup', e => {
 // pe telefon browserul preia gestul ca scroll: renunțăm la drag
 document.addEventListener('pointercancel', () => {
   if (!drag) return;
+  clearTimeout(drag.timer);
   drag.ghost?.remove();
   drag.zone?.classList.remove('over');
   drag = null;

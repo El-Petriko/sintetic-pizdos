@@ -113,7 +113,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 
 .token {
   position: absolute; translate: -50% -50%; left: calc(var(--x) * 100%); top: calc(var(--y) * 100%); display: flex; flex-direction: column; align-items: center; gap: 4px;
-  cursor: grab; user-select: none; touch-action: none;
+  cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .token .disc {
   position: relative; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
@@ -137,7 +137,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .chip {
   display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 10px 0 6px;
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
-  cursor: grab; user-select: none; touch-action: none; transition: border-color .15s, transform .15s;
+  cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: border-color .15s, transform .15s;
 }
 .chip:hover { border-color: #3a4d43; }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -243,8 +243,9 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   #halves { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
   [data-pitch="R"] { grid-row: 1; }
   [data-pitch="L"] { grid-row: 2; }
-  [data-pitch="L"] .token { left: calc(var(--y) * 100%); top: calc((1 - var(--x)) * 100%); }
-  [data-pitch="R"] .token { left: calc((1 - var(--y)) * 100%); top: calc(var(--x) * 100%); }
+  /* x pe verticală cu margine de 7% la capete (x' = .07 + .9x), ca portarul să nu intre sub linia porții; inversul e în pitchPoint() */
+  [data-pitch="L"] .token { left: calc(var(--y) * 100%); top: calc((.93 - var(--x) * .9) * 100%); flex-direction: column-reverse; }
+  [data-pitch="R"] .token { left: calc((1 - var(--y)) * 100%); top: calc((.07 + var(--x) * .9) * 100%); }
 
   .token .disc { width: 44px; height: 44px; border-width: 2.5px; }
   .token .av { font-size: 14px; }
@@ -253,7 +254,6 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 
   .pool .list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pool .group, .pool .empty { grid-column: 1 / -1; }
-  .chip { touch-action: pan-y; } /* lista se poate derula; pe teren jetoanele rămân trăgabile */
   .chip .name { font-size: 13px; }
   .chip .av { width: 30px; height: 30px; font-size: 12px; }
 

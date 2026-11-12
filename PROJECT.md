@@ -53,11 +53,15 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 - Telefon gata (2026-11-12): sub 700px teren vertical (dreapta sus, stânga jos), totul pe o coloană, lista în 2 coloane.
   Atingere: atingi jucătorul (bară jos cu Editează / Scoate / ✕), apoi un loc, alt jucător, teren sau listă. Merge și pe desktop;
   editarea pe desktop e prin dublu-click sau prin bară. Pozițiile sunt `--x/--y` în CSS, `pitchPoint()` e inversul.
+- Reparații telefon + import/export (2026-11-12): scroll de oriunde (drag cu degetul după ~250 ms ținut apăsat),
+  pe verticală margine de 7% la capete (portarul nu mai intră sub linie), eticheta echipei de jos deasupra discului.
+  Import/export jucători în JSON (`{"format": "sintetic-jucatori", "version": 1, "players": [...]}`), import după nume:
+  actualizează sau adaugă, nu șterge; câmpurile sunt validate (poza doar data:image base64).
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
-- Feedback pe telefon (testat doar emulat, 375×812).
+- Feedback pe telefonul real după reparații (drag ținut apăsat, scroll).
 - PWA (manifest, offline), dacă e nevoie.
 - Apoi: buton „Distribuie” (link/imagine cu echipele, varianta A).
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.
