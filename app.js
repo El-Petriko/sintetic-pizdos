@@ -72,12 +72,13 @@ function loadStore() {
   Object.values(st.sessions).forEach(normalize);
   return st;
 }
-function save() {
+function persist() {
   state.updated = Date.now();
   store.sessions[state.id] = state;
   store.current = state.id;
   try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
 }
+const save = () => { persist(); push(); }; // push: trimite schimbarea în sesiunea live, dacă e cazul
 
 const player = id => state.players.find(p => p.id === id);
 const team = id => state.teams.find(t => t.id === id);
@@ -141,6 +142,9 @@ const fmtDate = d => d ? new Date(d + 'T12:00').toLocaleDateString('ro-RO', { we
 const when = s => [fmtDate(s.date), [s.start, s.end].filter(Boolean).join('–')].filter(Boolean).join(', ');
 
 function render() {
+  stale = false;
+  $('#session').classList.toggle('live', !!state.live);
+  $('#session').classList.toggle('offline', !!state.live && !online);
   $('#s-name').textContent = state.name;
   $('#s-meta').textContent = [when(state), state.venue].filter(Boolean).join(' · ');
   document.title = `${state.name} · sintetic-pizdos`;
@@ -502,7 +506,7 @@ dlg.addEventListener('close', () => {
   const c = code($('#role').value), role = c && CODES[c] === pos ? c : undefined; // cod care nu se potrivește cu categoria: renunțăm la el
 
   if (action === 'ok' && name) commit(() => {
-    if (editing) Object.assign(editing, { name, pos, photo, role });
+    if (editing) Object.assign(player(editing.id) || editing, { name, pos, photo, role }); // jucătorul poate fi reîncărcat din live între timp
     else state.players.push({ id: uid(), name, pos, photo, role });
   });
   const id = editing?.id;
@@ -516,7 +520,7 @@ dlg.addEventListener('close', () => {
 const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const hhmm = ts => new Date(ts).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 const dur = () => state.matchMin * 60000;
-const elapsed = () => state.timer.acc + (state.timer.startedAt ? Date.now() - state.timer.startedAt : 0);
+const elapsed = () => state.timer.acc + (state.timer.startedAt ? now() - state.timer.startedAt : 0);
 const running = () => !!state?.timer.startedAt;
 
 function newGame() {
@@ -533,6 +537,14 @@ function tick() {
   $('#timer').classList.toggle('on', running());
   $('#timer').classList.toggle('done', left === 0);
   $('#timer').title = running() ? 'Pauză' : left === 0 ? 'Resetează cronometrul' : elapsed() ? 'Continuă' : 'Pornește cronometrul';
+  // lacătul golului: ceilalți așteaptă, cel care îl ține vede cât mai are
+  const other = lockedByOther(), btn = $('#goal-btn');
+  btn.disabled = other;
+  btn.textContent = other ? `⏳ Gol în curs · ${mmss(goalLock.until - now())}` : '⚽ GOL';
+  if (myLock && goalDlg.open) {
+    if (now() >= myLock) { goalDlg.close(); toast('Au trecut 45 de secunde, golul nu s-a înregistrat.'); }
+    else $('#goal-left').textContent = `Mai ai ${mmss(myLock - now())}`;
+  }
 }
 setInterval(tick, 250);
 
@@ -584,7 +596,7 @@ $('#timer').addEventListener('click', () => {
   const t = state.timer;
   if (running()) state.timer = { startedAt: null, acc: elapsed() };      // pauză
   else if (elapsed() >= dur()) state.timer = { startedAt: null, acc: 0 }; // gata: înapoi la 7:00
-  else t.startedAt = Date.now();                                          // start / continuă
+  else t.startedAt = now();                                              // start / continuă
   keepAwake(running());
   save();
   tick();
@@ -601,7 +613,9 @@ $('#new-game').addEventListener('click', () => {
 });
 
 const goalDlg = $('#goal');
-$('#goal-btn').addEventListener('click', () => {
+$('#goal-btn').addEventListener('click', async () => {
+  if (!(await takeLock())) return toast('Altcineva înregistrează deja un gol.');
+  $('#goal-left').textContent = '';
   const cols = state.playing.map(team).map(t => {
     const ps = t.slots.filter(Boolean).map(player);
     return `<div class="goal-col" style="--team:${t.color}"><h3><i></i>${esc(t.name)}</h3>${ps.length
@@ -612,6 +626,7 @@ $('#goal-btn').addEventListener('click', () => {
   $('#goal-time').textContent = `${hhmm(Date.now())}${elapsed() ? ` · minutul ${mmss(elapsed())}` : ''} · meciul ${state.game}`;
   goalDlg.showModal();
 });
+goalDlg.addEventListener('close', releaseLock);
 goalDlg.addEventListener('click', e => {
   const b = e.target.closest('[data-scorer]');
   if (!b) return;
@@ -619,7 +634,7 @@ goalDlg.addEventListener('click', e => {
   goalDlg.close();
   commit(() => state.goals.push({
     id: uid(), player: p.id, team: t.id, vs: [...state.playing], game: state.game,
-    at: Date.now(), t: elapsed() ? Math.round(elapsed()) : null,
+    at: now(), t: elapsed() ? Math.round(elapsed()) : null,
   }));
   navigator.vibrate?.(60);
   toast(`⚽ Gol! ${p.name} (${t.name})`);
@@ -724,7 +739,8 @@ function useSession(s, replace) {
   if (replace && state) delete store.sessions[state.id];
   state = s;
   sel = null;
-  save();
+  persist();
+  goLive();
   if (document.startViewTransition) document.startViewTransition(render).ready.catch(() => {});
   else render();
 }
@@ -825,6 +841,12 @@ function fillMenu() {
   for (const k of ['name', 'date', 'start', 'end', 'venue', 'matchMin']) f.elements[k].value = state[k] || '';
   const h = handles[state.id];
   $('#sm-file').textContent = h ? `Fișier: ${h.name}` : state.fileName ? `Fișier: ${state.fileName} (pe acest dispozitiv salvarea descarcă o copie nouă)` : 'Sesiunea nu a fost salvată încă într-un fișier.';
+  $('#sm-live').innerHTML = state.live
+    ? `<p><b class="live-dot${online ? '' : ' off'}">LIVE</b> ${online ? 'Conectat. Oricine are linkul vede și modifică sesiunea.' : 'Fără semnal: modificările se trimit când revine.'}</p>
+       <div class="actions"><button type="button" class="primary" data-act="live-share">Trimite linkul</button>
+       <button type="button" class="ghost-btn" data-act="live-off">Oprește live pe acest dispozitiv</button></div>`
+    : `<button type="button" class="primary" data-act="live-on">📡 Pune online</button>
+       <p class="hint">Primești un link: colegii văd și modifică live echipele, golurile și cronometrul.</p>`;
   $('#sm-save').textContent = h ? `Salvează în ${h.name}` : 'Salvează în fișier';
   $('#sm-list').innerHTML = Object.values(store.sessions).sort((a, b) => (b.updated || 0) - (a.updated || 0)).map(s => `
     <div class="sess${s.id === state.id ? ' on' : ''}">
@@ -864,6 +886,20 @@ smDlg.addEventListener('click', async e => {
   const act = b.dataset.act;
   if (!act) return;
   if (act === 'save' || act === 'save-as') { await saveSession(act === 'save-as'); return fillMenu(); }
+  if (act === 'live-on') {
+    const sid = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(36).padStart(2, '0')).join('');
+    state.live = sid;
+    persist();
+    if (await connect(sid, true)) shareLink();
+    else { state.live = null; persist(); }
+    return fillMenu();
+  }
+  if (act === 'live-share') return shareLink();
+  if (act === 'live-off') {
+    if (!confirm('Sesiunea rămâne pe acest dispozitiv, dar nu se mai sincronizează. Continui?')) return;
+    state.live = null; persist(); goLive(); render();
+    return fillMenu();
+  }
   smDlg.close();
   if (act === 'import') importSession(false);
   if (act === 'new') openNew('new');
@@ -895,4 +931,167 @@ $('#update').addEventListener('click', async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 checkUpdate();
 
-if (state) render(); else openNew('start');
+/* ---------- sesiune live (Firebase Realtime Database) ---------- */
+// Pe server, sub live/<sid>/d, fiecare bucată e un text JSON: câmpurile simple direct, iar jucătorii, golurile
+// și echipele câte unul pe cale (players/<id>, goals/<id>, teams/t0), ca două telefoane să poată modifica
+// lucruri diferite în același timp. Se trimite doar ce s-a schimbat față de ultima versiune știută (`synced`).
+const FB = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-';
+const FB_CONFIG = {
+  apiKey: 'AIzaSyDCospd_YB6tC24GdRMh58hOq8jCAsRVBo', authDomain: 'sintetic-pizdos.firebaseapp.com',
+  databaseURL: 'https://sintetic-pizdos-default-rtdb.europe-west1.firebasedatabase.app',
+  projectId: 'sintetic-pizdos', appId: '1:448897182271:web:d4cf811e0171a52f3aa68a',
+};
+const LOCAL = ['id', 'updated', 'fileName', 'live'];
+const LOCK_MS = 45000;
+let fb = null, subs = [], synced = {}, ready = false, online = false, offset = 0, stale = false;
+let goalLock = null, myLock = 0; // lacătul de pe server; până când îl țin eu (ora serverului)
+const now = () => Date.now() + offset; // ora serverului, ca cronometrul să arate la fel pe toate telefoanele
+const lockedByOther = () => !!(state?.live && goalLock && goalLock.by !== fb?.me && goalLock.until > now());
+
+// chei sortate: același conținut dă același text pe orice telefon, deci diferența arată doar schimbările reale
+const json = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort()) : x);
+function flat(st) {
+  const o = {};
+  for (const [k, v] of Object.entries(st)) {
+    if (LOCAL.includes(k)) continue;
+    if (k === 'players' || k === 'goals') v.forEach(x => (o[`${k}/${x.id}`] = json(x)));
+    else if (k === 'teams') v.forEach((t, i) => (o[`teams/t${i}`] = json(t)));
+    else o[k] = json(v);
+  }
+  return o;
+}
+const flatVal = v => Object.fromEntries(Object.entries(v).flatMap(([k, x]) =>
+  typeof x === 'string' ? [[k, x]] : Object.entries(x).map(([c, y]) => [`${k}/${c}`, y])));
+
+// Oricine are linkul poate scrie: datele de pe server trec prin aceleași verificări ca un fișier importat.
+const ID = /^[a-z0-9]{1,16}$/;
+function fromLive(f) {
+  const raw = { players: [], goals: [], teams: [] };
+  for (const [path, v] of Object.entries(f).sort()) {
+    const [k, c] = path.split('/');
+    let x; try { x = JSON.parse(v); } catch { continue; }
+    if (c && raw[k]) raw[k].push(x); else if (!c) raw[k] = x;
+  }
+  const size = raw.size === 6 ? 6 : 5, ok = id => typeof id === 'string' && ID.test(id);
+  const players = raw.players.filter(p => ok(p?.id)).map(p => ({ photo: null, ...cleanPlayer(p), id: p.id })).filter(p => p.name);
+  const has = new Set(players.map(p => p.id));
+  const teams = COLORS.map((color, i) => {
+    const t = raw.teams[i] || {}, custom = {};
+    for (const [k, v] of Object.entries(t.custom && typeof t.custom === 'object' ? t.custom : {}))
+      if (+k >= 0 && +k < size && Number.isFinite(v?.x) && Number.isFinite(v?.y)) custom[+k] = { x: clamp(v.x, 0, 1), y: clamp(v.y, 0, 1) };
+    return {
+      id: `t${i + 1}`, name: str(t.name, 20) || `Echipa ${i + 1}`, color: /^#[0-9a-f]{6}$/i.test(t.color) ? t.color : color,
+      formation: FORMATIONS[size].includes(t.formation) ? t.formation : undefined,
+      slots: Array.from({ length: size }, (_, j) => has.has(t.slots?.[j]) ? t.slots[j] : null), custom,
+    };
+  });
+  const tid = new Set(teams.map(t => t.id)), num = v => Number.isFinite(v) ? v : null;
+  const playing = Array.isArray(raw.playing) && raw.playing.length === 2 && raw.playing.every(x => tid.has(x)) && raw.playing[0] !== raw.playing[1] ? raw.playing : ['t1', 't2'];
+  const goals = raw.goals.filter(g => ok(g?.id) && ok(g.player) && tid.has(g.team) && Number.isInteger(g.game) && g.game >= 1 && Number.isFinite(g.at))
+    .map(g => ({ id: g.id, player: g.player, team: g.team, game: g.game, at: g.at, t: num(g.t),
+      vs: Array.isArray(g.vs) && g.vs.length === 2 && g.vs.every(x => tid.has(x)) ? g.vs : [...playing] }))
+    .sort((a, b) => a.at - b.at);
+  const tm = raw.timer || {};
+  return {
+    ...cleanMeta(raw), size, players, teams, playing, goals,
+    game: Number.isInteger(raw.game) && raw.game >= 1 ? raw.game : 1,
+    timer: { startedAt: num(tm.startedAt), acc: Math.max(0, num(tm.acc) || 0) },
+  };
+}
+
+function push() {
+  if (!fb || !state?.live || !ready) return;
+  const next = flat(state), upd = {};
+  for (const k in next) if (next[k] !== synced[k]) upd[k] = next[k];
+  for (const k in synced) if (!(k in next)) upd[k] = null;
+  synced = next;
+  // fără semnal, SDK-ul ține scrierile și le trimite când revine conexiunea
+  if (Object.keys(upd).length) fb.update(fb.ref(fb.db, `live/${state.live}/d`), upd).catch(() => toast('Serverul a refuzat modificarea.'));
+}
+
+function pull(sid, val) {
+  if (state?.live !== sid) return;
+  if (!val) { // nimic pe server: linkul e greșit sau sesiunea a fost ștearsă
+    if (!ready) { toast('Sesiunea live nu există.'); state.live = null; persist(); goLive(); render(); }
+    return;
+  }
+  const remote = flatVal(val), first = !ready;
+  ready = true;
+  const same = Object.keys(remote).length === Object.keys(synced).length && Object.keys(remote).every(k => remote[k] === synced[k]);
+  if (same) return; // ecoul propriei scrieri
+  synced = remote;
+  Object.assign(state, fromLive(remote));
+  normalize(state);
+  persist();
+  if (first) toast(`Conectat la „${state.name}”.`);
+  // cât tragi un jucător sau scrii într-un câmp, randarea așteaptă (altfel ți-ar fugi elementul de sub deget)
+  if (drag || document.activeElement?.matches('input')) stale = true; else render();
+}
+['focusout', 'pointerup'].forEach(ev => document.addEventListener(ev, () => { if (stale && !drag) render(); }));
+
+// Firebase se încarcă doar pentru sesiunile live. fresh = sesiunea abia a fost pusă online (serverul e gol).
+async function connect(sid, fresh = false) {
+  try {
+    if (!fb) {
+      const [app, auth, db] = await Promise.all(['app', 'auth', 'database'].map(m => import(`${FB}${m}.js`)));
+      const a = app.initializeApp(FB_CONFIG), au = auth.getAuth(a);
+      await au.authStateReady();
+      if (!au.currentUser) await auth.signInAnonymously(au);
+      fb = { ...db, db: db.getDatabase(a), me: au.currentUser.uid };
+      fb.onValue(fb.ref(fb.db, '.info/serverTimeOffset'), s => (offset = s.val() || 0));
+      fb.onValue(fb.ref(fb.db, '.info/connected'), s => { online = !!s.val(); if (state) render(); if (smDlg.open) fillMenu(); });
+    }
+  } catch { toast('Nu m-am putut conecta la serverul live.'); return false; }
+  if (state?.live !== sid) return false;
+  subs.forEach(u => u());
+  synced = {}; ready = fresh; goalLock = null;
+  if (fresh) push(); // înainte de abonare, ca primul răspuns să conțină deja sesiunea
+  subs = [
+    fb.onValue(fb.ref(fb.db, `live/${sid}/d`), s => pull(sid, s.val())),
+    fb.onValue(fb.ref(fb.db, `live/${sid}/lock`), s => { goalLock = s.val(); tick(); }),
+  ];
+  return true;
+}
+// La schimbarea sesiunii: ne abonăm la cea nouă, dacă e live, sau ne dezabonăm.
+function goLive() {
+  if (state?.live) return connect(state.live);
+  subs.forEach(u => u());
+  subs = []; ready = false; goalLock = null;
+}
+
+const liveUrl = () => `${location.origin}${location.pathname}#live=${state.live}`;
+function shareLink() {
+  const url = liveUrl();
+  if (navigator.share) return navigator.share({ title: state.name, url }).catch(() => {});
+  navigator.clipboard?.writeText(url).then(() => toast('Link copiat.'), () => prompt('Linkul sesiunii:', url)) ?? prompt('Linkul sesiunii:', url);
+}
+
+// Lacătul golului: un singur telefon înregistrează un gol odată, cel mult 45 s. Tranzacția îl dă unuia singur.
+async function takeLock() {
+  if (!state.live || !fb) return true;
+  if (lockedByOther()) return false;
+  if (!online) return true; // fără semnal nu putem întreba serverul: golul se înregistrează local
+  const until = now() + LOCK_MS;
+  try {
+    const r = await fb.runTransaction(fb.ref(fb.db, `live/${state.live}/lock`),
+      cur => cur && cur.by !== fb.me && cur.until > now() ? undefined : { by: fb.me, until });
+    if (!r.committed) return false;
+  } catch { return true; }
+  myLock = until;
+  return true;
+}
+function releaseLock() {
+  if (!myLock || !fb || !state.live) return;
+  myLock = 0;
+  fb.runTransaction(fb.ref(fb.db, `live/${state.live}/lock`), cur => cur?.by === fb.me ? null : undefined).catch(() => {});
+}
+
+// Linkul #live=<sid>: deschide sesiunea (sau o creează pe dispozitiv), apoi o umple de pe server.
+addEventListener('hashchange', () => { if (location.hash.includes('live=')) location.reload(); }); // linkul deschis peste aplicație
+const joinId = location.hash.match(/live=([a-z0-9]{20,})/)?.[1];
+if (joinId) {
+  history.replaceState(null, '', location.pathname);
+  let s = Object.values(store.sessions).find(x => x.live === joinId);
+  if (!s) { s = blankSession({ name: 'Sesiune live' }); s.live = joinId; }
+  useSession(s);
+} else if (state) { render(); goLive(); } else openNew('start');

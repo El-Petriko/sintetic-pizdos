@@ -370,3 +370,13 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   .timer { padding: 8px 12px; }
   .goal-btn { padding: 10px 12px; }
 }
+
+/* live */
+.session-btn.live b::before { content: '● '; color: #2ec27e; }
+.session-btn.live.offline b::before { color: var(--muted); }
+.live-box { display: grid; gap: 8px; margin: 4px 0 8px; }
+.live-box p { margin: 0; font-size: 13px; line-height: 1.4; }
+.live-dot { color: #2ec27e; font-size: 12px; letter-spacing: .05em; }
+.live-dot.off { color: var(--muted); }
+.goal-btn:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.6); }
+.lock-left { color: var(--text, inherit); font-weight: 600; }

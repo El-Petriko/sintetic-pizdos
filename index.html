@@ -112,6 +112,7 @@
         <label class="lbl">Teren<input class="field" name="venue" maxlength="40"></label>
         <label class="lbl">Minute pe meci<input class="field" type="number" name="matchMin" min="1" max="60" inputmode="numeric"></label>
       </div>
+      <div class="live-box" id="sm-live"></div>
       <p class="hint" id="sm-file"></p>
       <div class="actions">
         <button type="button" class="primary" data-act="save" id="sm-save">Salvează în fișier</button>
@@ -132,6 +133,7 @@
     <form method="dialog">
       <h2>⚽ Cine a dat gol?</h2>
       <p class="hint" id="goal-time"></p>
+      <p class="hint lock-left" id="goal-left"></p>
       <div class="goal-cols" id="goal-cols"></div>
       <menu><span class="spacer"></span><button value="cancel">Anulează</button></menu>
     </form>
