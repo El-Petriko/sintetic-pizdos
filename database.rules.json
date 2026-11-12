@@ -10,25 +10,36 @@
         "d": {
           "goals": {
             "$g": {
-              ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && !data.exists()"
+              ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && !data.exists() && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
             }
           },
           "timer": {
-            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('timer').val() !== false"
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('timer').val() !== false && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
           },
           "game": {
-            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
           },
           "playing": {
-            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
           },
           "since": {
-            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
+          },
+          "matches": {
+            "$m": {
+              ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && !data.exists() && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
+            }
           }
         },
         "lock": {
-          ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+          ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && (!root.child('live').child($sid).child('window').exists() || (now >= root.child('live').child($sid).child('window').child('from').val() && now <= root.child('live').child($sid).child('window').child('to').val()))"
         }
+      }
+    },
+    "arhiva": {
+      "$k": {
+        ".read": "auth != null && auth.uid === 'rYXL1ZGGjdhs39mDCvVXd1IIzKs1'",
+        ".write": "auth != null && auth.uid === 'rYXL1ZGGjdhs39mDCvVXd1IIzKs1'"
       }
     }
   }
