@@ -29,7 +29,7 @@
     <main>
       <div class="matchup" id="matchup"></div>
       <div class="pitch">
-        <svg viewBox="0 0 1000 500" aria-hidden="true">
+        <svg viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <pattern id="stripes" width="125" height="500" patternUnits="userSpaceOnUse">
               <rect width="62.5" height="500" fill="#ffffff0a"/>
@@ -57,6 +57,8 @@
       <div class="teams" id="teams"></div>
     </main>
   </div>
+
+  <div class="selbar" id="selbar" aria-live="polite"></div>
 
   <dialog id="editor">
     <form method="dialog">

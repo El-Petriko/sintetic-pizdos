@@ -46,7 +46,7 @@ const formationOf = t => FORMATIONS[state.size].includes(t.formation) ? t.format
 
 // "2-1-1" → portarul + liniile, de la apărare la atac
 function spots(f) {
-  const lines = f.split('-').map(Number), out = [{ x: .08, y: .5, role: 'P' }];
+  const lines = f.split('-').map(Number), out = [{ x: .12, y: .5, role: 'P' }];
   lines.forEach((n, i) => {
     const x = .3 + i * (.52 / (lines.length - 1));
     const role = i === lines.length - 1 ? 'A' : i === 0 ? 'F' : 'M';
@@ -86,12 +86,12 @@ function half(t, side) {
   const sp = spots(formationOf(t));
   const tokens = t.slots.map((id, i) => {
     const { x, y } = t.custom[i] || sp[i];
-    const left = (side === 'L' ? x : 1 - x) * 100, top = y * 100;
+    const at = `--x:${x};--y:${y}`;
     const p = id && player(id);
     return p
-      ? `<div class="token" data-id="${p.id}" data-slot="${i}" title="${esc(p.name)} · ${ROLE[p.pos]}" style="left:${left}%;top:${top}%;view-transition-name:k-${p.id}">
+      ? `<div class="token" data-id="${p.id}" data-slot="${i}" title="${esc(p.name)} · ${ROLE[p.pos]}" style="${at};view-transition-name:k-${p.id}">
           <div class="disc">${avatar(p)}<span class="pos pos-${p.pos}">${p.pos}</span></div><span class="tname">${esc(short(p))}</span></div>`
-      : `<div class="token empty" data-slot="${i}" style="left:${left}%;top:${top}%">
+      : `<div class="token empty" data-slot="${i}" style="${at}">
           <div class="disc"></div><span class="tname">${ROLE[sp[i].role]}</span></div>`;
   }).join('');
   return `<div class="half" data-zone="${t.id}" data-pitch="${side}" style="--team:${t.color}">${tokens}</div>`;
@@ -136,6 +136,15 @@ function render() {
       <div class="list">${slots.join('')}</div>
     </section>`;
   }).join('');
+
+  const sp = sel && player(sel);
+  if (!sp) sel = null;
+  document.body.classList.toggle('selecting', !!sel);
+  document.querySelectorAll(`[data-id="${sel}"]`).forEach(el => el.classList.add('sel'));
+  $('#selbar').innerHTML = sp ? `${avatar(sp)}<span class="name">${esc(sp.name)}<small>Atinge un loc sau alt jucător</small></span>
+    <button class="ghost-btn sm" data-act="edit">Editează</button>
+    ${teamOf(sel) ? '<button class="ghost-btn sm" data-act="out">Scoate</button>' : ''}
+    <button class="ghost-btn sm" data-act="close" aria-label="Renunță">✕</button>` : '';
 }
 
 /* ---------- drop logic ---------- */
@@ -193,39 +202,92 @@ document.addEventListener('pointermove', e => {
   if (over !== drag.over) { drag.over?.classList.remove('target'); over?.classList.add('target'); drag.over = over; }
 });
 
+// Pe ecran îngust terenul e vertical: echipa din stânga jos, cea din dreapta sus (aceeași regulă ca în CSS).
+const VERTICAL = matchMedia('(max-width: 700px)');
+
+// Punct pe ecran → {x, y} în jumătatea echipei (inversul calculului din CSS).
+function pitchPoint(zoneEl, cx, cy) {
+  const r = zoneEl.getBoundingClientRect(), fx = (cx - r.left) / r.width, fy = (cy - r.top) / r.height;
+  const L = zoneEl.dataset.pitch === 'L';
+  const [x, y] = VERTICAL.matches ? (L ? [1 - fy, fx] : [fy, 1 - fx]) : (L ? [fx, fy] : [1 - fx, fy]);
+  return { x: clamp(x, .1, .95), y: clamp(y, .08, .92) };
+}
+
+// Mută jucătorul acolo unde a fost lăsat (drag) sau unde s-a atins (selecție). Doar mută starea, fără render.
+function place(id, zoneEl, slotEl, cx, cy) {
+  const zone = zoneEl?.dataset.zone, slot = slotEl ? +slotEl.dataset.slot : null;
+  const ok = zone && move(id, zone, slot);
+  if (!ok && zoneEl) zoneEl.classList.add('reject'), setTimeout(() => zoneEl.classList.remove('reject'), 400);
+  // lăsat pe teren, dar nu pe un loc anume: jucătorul rămâne exact unde l-ai pus
+  if (ok && zoneEl.dataset.pitch && slot == null) {
+    const t = team(zone), i = t.slots.indexOf(id);
+    if (i >= 0) t.custom[i] = pitchPoint(zoneEl, cx, cy);
+  }
+  return ok;
+}
+
 document.addEventListener('pointerup', e => {
   if (!drag) return;
   const d = drag; drag = null;
-  if (!d.ghost) return openEditor(d.id); // click simplu = editare
+  if (!d.ghost) return tapPlayer(d.id);
 
   d.zone?.classList.remove('over');
   d.over?.classList.remove('target');
-  const zone = d.zone?.dataset.zone;
-  const pitch = d.zone?.dataset.pitch;
-  const slot = d.over ? +d.over.dataset.slot : null;
-  const r = d.zone?.getBoundingClientRect();
   const cx = e.clientX - d.dx + d.w / 2, cy = e.clientY - d.dy + d.h / 2; // centrul jetonului tras
-
-  const ok = zone && move(d.id, zone, slot);
-  if (!ok && d.zone) d.zone.classList.add('reject'), setTimeout(() => d.zone.classList.remove('reject'), 400);
-
-  // lăsat pe teren, dar nu pe un loc anume: jucătorul rămâne exact unde l-ai pus
-  if (ok && pitch && slot == null) {
-    const t = team(zone), i = t.slots.indexOf(d.id);
-    const lx = (cx - r.left) / r.width;
-    if (i >= 0) t.custom[i] = {
-      x: clamp(pitch === 'L' ? lx : 1 - lx, .05, .95),
-      y: clamp((cy - r.top) / r.height, .08, .92),
-    };
-  }
+  const ok = place(d.id, d.zone, d.over, cx, cy);
+  if (ok) sel = null;
 
   // jetonul „zboară” din fantomă spre locul nou (sau înapoi): pe teren spre jeton, altfel spre rândul din listă
-  vtName(d.ghost, (pitch && ok ? 'k-' : 'p-') + d.id);
+  vtName(d.ghost, (d.zone?.dataset.pitch && ok ? 'k-' : 'p-') + d.id);
   commit(() => d.ghost.remove());
+});
+
+// pe telefon browserul preia gestul ca scroll: renunțăm la drag
+document.addEventListener('pointercancel', () => {
+  if (!drag) return;
+  drag.ghost?.remove();
+  drag.zone?.classList.remove('over');
+  drag = null;
+  render();
+});
+
+/* ---------- atingere: selectezi un jucător, apoi atingi unde să meargă ---------- */
+let sel = null;
+
+function tapPlayer(id) {
+  if (!sel || sel === id) { sel = sel === id ? null : id; return render(); }
+  const a = teamOf(sel), b = teamOf(id);
+  if (!a && !b) { sel = id; return render(); } // amândoi în listă: schimbi selecția
+  const from = sel;
+  sel = null;
+  // b în echipă: `from` îi ia locul; altfel cel din listă intră în locul lui `from`
+  commit(() => b ? move(from, b.id, b.slots.indexOf(id)) : move(id, a.id, a.slots.indexOf(from)));
+}
+
+document.addEventListener('click', e => {
+  if (!sel || e.target.closest('[data-id], #selbar, button, input, dialog')) return;
+  const zoneEl = e.target.closest('[data-zone]');
+  if (!zoneEl) return;
+  const slotEl = e.target.closest('[data-slot]'), id = sel;
+  if (place(id, zoneEl, slotEl, e.clientX, e.clientY)) { sel = null; commit(() => {}); }
+});
+
+$('#selbar').addEventListener('click', e => {
+  const act = e.target.dataset.act, id = sel;
+  if (!act) return;
+  sel = null;
+  if (act === 'edit') { render(); openEditor(id); }
+  else if (act === 'out') commit(() => move(id, null));
+  else render();
 });
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.classList.contains('chip')) openEditor(e.target.dataset.id);
+  if (e.key === 'Escape' && sel && !dlg.open) { sel = null; render(); }
+});
+document.addEventListener('dblclick', e => {
+  const c = e.target.closest('[data-id]');
+  if (c) { sel = null; render(); openEditor(c.dataset.id); }
 });
 
 /* ---------- header, teren, echipe ---------- */

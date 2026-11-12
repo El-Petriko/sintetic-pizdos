@@ -50,10 +50,14 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   4 formații pentru fiecare mărime, drag pe teren (poziție liberă, schimb pe un jeton, loc liber, înapoi în listă).
 - Val 3 gata (2026-11-12): bară „echipă VS echipă” cu formațiile, poziția preferată pe jetoane, postul locului în carduri
   (portocaliu dacă diferă de poziția preferată), lista grupată pe posturi, prenume diferențiate, teren cu colțuri și puncte de penalty, favicon.
+- Telefon gata (2026-11-12): sub 700px teren vertical (dreapta sus, stânga jos), totul pe o coloană, lista în 2 coloane.
+  Atingere: atingi jucătorul (bară jos cu Editează / Scoate / ✕), apoi un loc, alt jucător, teren sau listă. Merge și pe desktop;
+  editarea pe desktop e prin dublu-click sau prin bară. Pozițiile sunt `--x/--y` în CSS, `pitchPoint()` e inversul.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
-- Următorul: layout de telefon (+ PWA: manifest, service worker pentru offline).
+- Feedback pe telefon (testat doar emulat, 375×812).
+- PWA (manifest, offline), dacă e nevoie.
 - Apoi: buton „Distribuie” (link/imagine cu echipele, varianta A).
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.
