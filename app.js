@@ -47,6 +47,7 @@ function normalize(s) {
   // meciul curent: număr, golurile înregistrate și cronometrul (acc = ms scurși înainte de ultimul start)
   s.game ||= 1;
   s.goals ||= [];
+  s.matches ||= []; // fișa fiecărui meci încheiat (pentru istoric/statistici)
   s.timer = timer0(s.timer);
   s.matchMin ||= 7;
   for (const t of s.teams) {
@@ -83,6 +84,7 @@ function persist() {
   store.sessions[state.id] = state;
   store.current = state.id;
   try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
+  archive();
 }
 // push: trimite schimbarea în sesiunea live, dacă e cazul. Spectatorul poate schimba doar golurile și cronometrul.
 const save = () => { if (forbidden()) return revert(); record('tu'); persist(); push(); };
@@ -537,12 +539,23 @@ const setTimer = o => (state.timer = timer0({ at: now(), ...o }));
 
 // Echipa `out` iese, intră cea de pe margine, începe meciul următor (cronometrul așteaptă pornirea).
 // since[echipă] = meciul de la care e pe teren, ca la egal să iasă cea venită mai demult.
-function swapIn(out) {
+function swapIn(out, reason = 'manual') {
   const wait = state.teams.find(t => !state.playing.includes(t.id));
+  closeMatch(reason, out);
   state.playing[state.playing.indexOf(out)] = wait.id;
   state.since = { ...state.since, [wait.id]: state.game + 1 };
   newGame();
   return wait;
+}
+// Fișa meciului curent: cine a jucat (cu jucătorii de atunci), scorul, cine a ieșit și de ce. Meciurile goale nu se notează.
+function closeMatch(reason, out = null) {
+  const [a, b] = state.playing, score = [goalsOf(a), goalsOf(b)];
+  state.matches = state.matches.filter(m => m.game !== state.game); // după un „Readu aici” meciul se rescrie
+  if (!score[0] && !score[1] && !elapsed()) return;
+  state.matches.push({
+    id: `m${state.game}`, game: state.game, teams: [a, b], score, out, reason, end: now(), played: Math.round(elapsed()),
+    winner: score[0] === score[1] ? null : score[0] > score[1] ? a : b, lineups: [a, b].map(id => team(id).slots.filter(Boolean)),
+  });
 }
 const goalsOf = id => state.goals.filter(g => g.game === state.game && g.team === id).length;
 // Timpul s-a terminat: pierde cine are mai puține goluri; la egal iese cine e pe teren de mai mult timp
@@ -551,7 +564,7 @@ function endByTime() {
   const [a, b] = state.playing, ga = goalsOf(a), gb = goalsOf(b), since = state.since || {};
   const out = ga !== gb ? (ga < gb ? a : b) : (since[b] ?? 1) < (since[a] ?? 1) ? b : a;
   const win = out === a ? b : a, wn = team(win).name, on = team(out).name;
-  const wait = swapIn(out);
+  const wait = swapIn(out, 'timp');
   return ga !== gb ? `⏱ Timp! ${wn} câștigă ${Math.max(ga, gb)}–${Math.min(ga, gb)}. Intră ${wait.name} în locul ${on}.`
     : `⏱ Timp! Egal ${ga}–${gb}: iese ${on} (pe teren de mai mult timp), intră ${wait.name}.`;
 }
@@ -562,8 +575,18 @@ function newGame() {
   ring(false);
 }
 
+const pad = n => String(n).padStart(2, '0');
+const dhms = ms => { const s = Math.ceil(ms / 1000), d = Math.floor(s / 86400); return `${d ? d + ' z ' : ''}${Math.floor(s % 86400 / 3600)}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}`; };
+function countdown() {
+  const w = windowOf(state), t = now(), cd = $('#countdown'), show = !!w && (t < w.from || t > w.to);
+  cd.hidden = !show;
+  if (show) cd.innerHTML = (t < w.from ? `⏳ Începe în <b>${dhms(w.from - t)}</b>` : `Sesiunea s-a încheiat la ${hhmm(w.to)}`)
+    + (viewer() ? '<small>Vezi echipele; golurile și cronometrul merg doar în timpul sesiunii.</small>' : '');
+}
+
 function tick() {
   if (!state) return;
+  countdown();
   const left = Math.max(0, dur() - elapsed());
   if (running() && left === 0) return finish();
   warnMinute(left);
@@ -676,7 +699,7 @@ $('#timer-reset').addEventListener('click', () => {
 $('#new-game').addEventListener('click', () => {
   if (!confirm(`Începi meciul ${state.game + 1}? Scorul pornește de la 0–0.`)) return;
   keepAwake(false);
-  commit(newGame);
+  commit(() => { closeMatch('manual'); newGame(); });
 });
 
 const goalDlg = $('#goal');
@@ -709,7 +732,7 @@ goalDlg.addEventListener('click', e => {
     // Se calculează aici, pe starea de la momentul salvării (commit poate rula după un alt gol).
     const loser = team(state.playing.find(id => id !== t.id));
     if (!state.playing.includes(t.id) || goalsOf(t.id) < WIN) return toast(`⚽ Gol! ${p.name} (${t.name})`), navigator.vibrate?.(60);
-    const score = `${goalsOf(t.id)}–${goalsOf(loser.id)}`, wait = swapIn(loser.id);
+    const score = `${goalsOf(t.id)}–${goalsOf(loser.id)}`, wait = swapIn(loser.id, '2 goluri');
     toast(`🏆 ${t.name} câștigă ${score}! Intră ${wait.name} în locul ${loser.name}. Porniți cronometrul când sunteți gata.`);
     navigator.vibrate?.([80, 60, 80, 60, 200]);
     keepAwake(false);
@@ -1040,7 +1063,17 @@ const LOCAL = ['id', 'updated', 'fileName', 'live', 'mine', 'history']; // mine 
 const LOCK_MS = 45000;
 let fb = null, subs = [], synced = {}, ready = false, online = false, offset = 0, stale = false;
 let perm = { goals: true, timer: true }; // ce pot face spectatorii (le alege organizatorul)
-const can = k => !viewer() || perm[k] !== false;
+// Spectatorii interacționează doar în intervalul sesiunii (data + de la / până la); fără oră de start, oricând.
+// Fără oră de final: 2 ore. Serverul aplică aceeași regulă (live/<sid>/window, scris de organizator).
+function windowOf(s) {
+  const from = s?.start ? new Date(`${s.date}T${s.start}`).getTime() : NaN;
+  if (!Number.isFinite(from)) return null;
+  let to = s.end ? new Date(`${s.date}T${s.end}`).getTime() : from + 2 * 3600e3;
+  if (to <= from) to += 24 * 3600e3; // se termină după miezul nopții
+  return { from, to };
+}
+const inWindow = () => { const w = windowOf(state); return !w || (now() >= w.from && now() <= w.to); };
+const can = k => !viewer() || (perm[k] !== false && inWindow());
 let goalLock = null, myLock = 0; // lacătul de pe server; până când îl țin eu (ora serverului)
 const now = () => Date.now() + offset; // ora serverului, ca cronometrul să arate la fel pe toate telefoanele
 const viewer = () => !!state?.live && !state.mine;
@@ -1050,7 +1083,7 @@ function forbidden() {
   const next = flat(state);
   return Object.keys({ ...next, ...synced }).some(k => {
     if (next[k] === synced[k]) return false;
-    if (k.startsWith('goals/')) return !can('goals') || synced[k] !== undefined; // spectatorul doar adaugă goluri
+    if (k.startsWith('goals/') || k.startsWith('matches/')) return !can('goals') || synced[k] !== undefined; // spectatorul doar adaugă
     if (['game', 'playing', 'since'].includes(k)) return !can('goals');                   // rotația vine din goluri
     return k !== 'timer' || !can('timer');
   });
@@ -1068,7 +1101,7 @@ function flat(st) {
   const o = {};
   for (const [k, v] of Object.entries(st)) {
     if (LOCAL.includes(k)) continue;
-    if (k === 'players' || k === 'goals') v.forEach(x => (o[`${k}/${x.id}`] = json(x)));
+    if (k === 'players' || k === 'goals' || k === 'matches') v.forEach(x => (o[`${k}/${x.id}`] = json(x)));
     else if (k === 'teams') v.forEach((t, i) => (o[`teams/t${i}`] = json(t)));
     else o[k] = json(v);
   }
@@ -1080,7 +1113,7 @@ const flatVal = v => Object.fromEntries(Object.entries(v).flatMap(([k, x]) =>
 // Oricine are linkul poate scrie: datele de pe server trec prin aceleași verificări ca un fișier importat.
 const ID = /^[a-z0-9]{1,16}$/;
 function fromLive(f) {
-  const raw = { players: [], goals: [], teams: [] };
+  const raw = { players: [], goals: [], teams: [], matches: [] };
   for (const [path, v] of Object.entries(f).sort()) {
     const [k, c] = path.split('/');
     let x; try { x = JSON.parse(v); } catch { continue; }
@@ -1105,9 +1138,16 @@ function fromLive(f) {
     .map(g => ({ id: g.id, player: g.player, team: g.team, game: g.game, at: g.at, t: num(g.t),
       vs: Array.isArray(g.vs) && g.vs.length === 2 && g.vs.every(x => tid.has(x)) ? g.vs : [...playing] }))
     .sort((a, b) => a.at - b.at);
+  const int = v => Number.isInteger(v) && v >= 0, ids = v => Array.isArray(v) ? v.filter(ok) : [];
+  const matches = raw.matches.filter(m => /^m\d{1,6}$/.test(m?.id) && Number.isInteger(m.game) && m.game >= 1 && Array.isArray(m.teams) && m.teams.length === 2
+      && m.teams.every(x => tid.has(x)) && Array.isArray(m.score) && m.score.length === 2 && m.score.every(int))
+    .map(m => ({ id: m.id, game: m.game, teams: m.teams, score: m.score, out: tid.has(m.out) ? m.out : null, winner: tid.has(m.winner) ? m.winner : null,
+      reason: ['timp', '2 goluri', 'manual'].includes(m.reason) ? m.reason : 'manual', end: num(m.end), played: int(m.played) ? m.played : 0,
+      lineups: Array.isArray(m.lineups) ? m.lineups.slice(0, 2).map(ids) : [[], []] }))
+    .sort((a, b) => a.game - b.game);
   const tm = raw.timer || {};
   return {
-    ...cleanMeta(raw), size, players, teams, playing, goals,
+    ...cleanMeta(raw), size, players, teams, playing, goals, matches,
     game: Number.isInteger(raw.game) && raw.game >= 1 ? raw.game : 1,
     since: Object.fromEntries(Object.entries(raw.since && typeof raw.since === 'object' ? raw.since : {}).filter(([k, v]) => tid.has(k) && Number.isInteger(v) && v >= 1)),
     timer: timer0({ startedAt: num(tm.startedAt), acc: Math.max(0, num(tm.acc) || 0), pauseUntil: num(tm.pauseUntil), at: num(tm.at) }),
@@ -1122,6 +1162,26 @@ function push() {
   synced = next;
   // fără semnal, SDK-ul ține scrierile și le trimite când revine conexiunea
   if (Object.keys(upd).length) fb.update(fb.ref(fb.db, `live/${state.live}/d`), upd).catch(() => toast('Serverul a refuzat modificarea.'));
+  if (state.mine) {
+    const w = json(windowOf(state));
+    if (w !== lastWindow) { lastWindow = w; fb.set(fb.ref(fb.db, `live/${state.live}/window`), windowOf(state)).catch(() => {}); }
+  }
+}
+let lastWindow = null;
+
+// Arhiva: telefonul organizatorului ține pe server o copie a sesiunii (fără poze) sub arhiva/<id sesiune>,
+// doar contul lui o citește și o scrie. Rămâne după încheierea live-ului și după „Link nou”.
+let archTimer;
+function archive() {
+  if (!fb || !state?.live || !state.mine || fb.au.currentUser?.isAnonymous) return;
+  clearTimeout(archTimer);
+  const s = state;
+  archTimer = setTimeout(() => fb.set(fb.ref(fb.db, `arhiva/${s.id}`), JSON.parse(json({
+    name: s.name, date: s.date, start: s.start, end: s.end, venue: s.venue, size: s.size, matchMin: s.matchMin, updated: now(),
+    teams: s.teams.map(({ id, name, color }) => ({ id, name, color })),
+    players: s.players.map(({ id, name, pos, role }) => ({ id, name, pos, role: role || null })),
+    matches: s.matches, goals: s.goals,
+  }))).catch(() => {}), 3000);
 }
 
 function pull(sid, val) {
@@ -1245,7 +1305,7 @@ function releaseLock() {
 // Istoricul stă doar pe dispozitivul organizatorului (sau local): fiecare schimbare de scor, meci, echipe sau cronometru
 // e o poză a meciului. „Readu aici” pune totul înapoi cum era atunci, deci repară orice abuz dintr-o atingere.
 const HIST = 25;
-const core = x => json({ goals: x.goals, game: x.game, playing: x.playing, slots: x.slots, timer: x.timer });
+const core = x => json({ goals: x.goals, game: x.game, playing: x.playing, slots: x.slots, timer: x.timer, matches: x.matches });
 let nextLabel = null;
 function describe(a, b) {
   if (!a) return 'început';
@@ -1266,7 +1326,7 @@ function describe(a, b) {
 function record(by) {
   if (viewer()) return;
   const h = (state.history ||= []), last = h.at(-1);
-  const snap = JSON.parse(json({ goals: state.goals, game: state.game, playing: state.playing, slots: state.teams.map(t => t.slots), timer: state.timer }));
+  const snap = JSON.parse(json({ goals: state.goals, game: state.game, playing: state.playing, slots: state.teams.map(t => t.slots), timer: state.timer, matches: state.matches }));
   if (last && core(last) === core(snap)) return;
   h.push({ ...snap, at: now(), by, label: nextLabel || describe(last, snap), el: elapsed(), run: running() });
   nextLabel = null;
@@ -1299,7 +1359,7 @@ function adjust(sec) {
 }
 function restore(h) { // fără commit(): animația s-ar desena peste panoul deschis
   nextLabel = `↩ readus la ${hhmm(h.at)}`;
-  Object.assign(state, JSON.parse(json({ goals: h.goals, game: h.game, playing: h.playing })));
+  Object.assign(state, JSON.parse(json({ goals: h.goals, game: h.game, playing: h.playing, matches: h.matches || [] })));
   h.slots.forEach((sl, i) => { if (state.teams[i]) state.teams[i].slots = [...sl]; });
   state.timer = timer0({ acc: h.el, startedAt: h.run ? now() : null, at: now() });
   normalize(state);
