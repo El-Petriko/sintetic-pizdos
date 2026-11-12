@@ -381,8 +381,7 @@ $('#size').addEventListener('click', e => {
 $('#bench').addEventListener('click', e => {
   const out = e.target.dataset.swap;
   if (!out) return;
-  const wait = state.teams.find(t => !state.playing.includes(t.id));
-  commit(() => { state.playing[state.playing.indexOf(out)] = wait.id; newGame(); });
+  commit(() => swapIn(out));
 });
 $('#teams').addEventListener('click', e => {
   const f = e.target.dataset.form;
@@ -536,6 +535,27 @@ const paused = () => !!state && !running() && !!state.timer.pauseUntil;
 const cooling = () => viewer() && !!state?.timer.at && now() - state.timer.at < COOLDOWN; // organizatorul nu are cooldown
 const setTimer = o => (state.timer = timer0({ at: now(), ...o }));
 
+// Echipa `out` iese, intră cea de pe margine, începe meciul următor (cronometrul așteaptă pornirea).
+// since[echipă] = meciul de la care e pe teren, ca la egal să iasă cea venită mai demult.
+function swapIn(out) {
+  const wait = state.teams.find(t => !state.playing.includes(t.id));
+  state.playing[state.playing.indexOf(out)] = wait.id;
+  state.since = { ...state.since, [wait.id]: state.game + 1 };
+  newGame();
+  return wait;
+}
+const goalsOf = id => state.goals.filter(g => g.game === state.game && g.team === id).length;
+// Timpul s-a terminat: pierde cine are mai puține goluri; la egal iese cine e pe teren de mai mult timp
+// (la primul meci, când au intrat amândouă odată, iese prima echipă).
+function endByTime() {
+  const [a, b] = state.playing, ga = goalsOf(a), gb = goalsOf(b), since = state.since || {};
+  const out = ga !== gb ? (ga < gb ? a : b) : (since[b] ?? 1) < (since[a] ?? 1) ? b : a;
+  const win = out === a ? b : a, wn = team(win).name, on = team(out).name;
+  const wait = swapIn(out);
+  return ga !== gb ? `⏱ Timp! ${wn} câștigă ${Math.max(ga, gb)}–${Math.min(ga, gb)}. Intră ${wait.name} în locul ${on}.`
+    : `⏱ Timp! Egal ${ga}–${gb}: iese ${on} (pe teren de mai mult timp), intră ${wait.name}.`;
+}
+
 function newGame() {
   state.game++;
   state.timer = timer0();
@@ -546,6 +566,7 @@ function tick() {
   if (!state) return;
   const left = Math.max(0, dur() - elapsed());
   if (running() && left === 0) return finish();
+  warnMinute(left);
   $('#clock').textContent = mmss(left);
   $('#timer').classList.toggle('on', running());
   $('#timer').classList.toggle('done', left === 0);
@@ -581,13 +602,25 @@ function tone(at, freq) {
   tones.push(o);
 }
 // alarma: 3 reprize de câte 8 bipuri (~11 s); o atingere pe cronometru o oprește
-function ring(on) {
+// rounds = câte reprize de 8 bipuri: 3 la final, 1 la avertismentul de un minut
+function ring(on, rounds = 3) {
   document.body.classList.toggle('alarm', on);
   tones.forEach(o => { try { o.stop(); } catch {} });
   tones = [];
   if (!on) return navigator.vibrate?.(0);
-  navigator.vibrate?.([500, 200, 500, 200, 900, 1500, 500, 200, 500, 200, 900, 1500, 500, 200, 500, 200, 900]);
-  if (audio) for (let i = 0; i < 24; i++) tone(i * .4 + Math.floor(i / 8) * 1.2, i % 2 ? 660 : 880);
+  navigator.vibrate?.([500, 200, 500, 200, 900, 1500, 500, 200, 500, 200, 900, 1500, 500, 200, 500, 200, 900].slice(0, rounds * 6 - 1));
+  if (audio) for (let i = 0; i < rounds * 8; i++) tone(i * .4 + Math.floor(i / 8) * 1.2, i % 2 ? 660 : 880);
+}
+// Mai e un minut: o repriză de bipuri și clipire scurtă, o singură dată (doar când timpul trece de 1:00, nu la deschidere).
+const WARN_MS = 60000;
+let lastLeft = null;
+function warnMinute(left) {
+  const crossed = running() && lastLeft > WARN_MS && left <= WARN_MS && left > WARN_MS - 2000; // nu și la un salt peste prag
+  lastLeft = left;
+  if (!crossed) return;
+  ring(true, 1);
+  setTimeout(() => { if (running()) document.body.classList.remove('alarm'); }, 3500);
+  toast('Mai e un minut!');
 }
 // ecranul rămâne aprins cât merge cronometrul (altfel telefonul se blochează și alarma întârzie)
 async function keepAwake(on) {
@@ -598,19 +631,23 @@ async function keepAwake(on) {
 }
 document.addEventListener('visibilitychange', () => { lock = null; if (!document.hidden && running()) keepAwake(true); });
 
+// Toate telefoanele ajung aici în aceeași secundă și calculează aceeași rotație, deci scrierile coincid.
+// Spectatorul fără drept la goluri nu poate schimba echipele: oprește doar local și așteaptă rotația de la ceilalți.
 function finish() {
-  state.timer = timer0({ acc: dur() });
-  if (can('timer')) save(); else persist(); // spectator fără drept: doar local, serverul primește varianta organizatorului
-  tick();
+  let msg = 'Timpul a expirat!';
+  if (can('goals')) msg = endByTime() + ' Porniți cronometrul când sunteți gata.';
+  else state.timer = timer0({ acc: dur() });
+  if (can('goals')) save(); else persist();
+  render();
   keepAwake(false);
   ring(true);
-  toast('Timpul a expirat!');
+  toast(msg);
 }
 
 $('#timer').addEventListener('click', () => {
   audio ||= window.AudioContext && new AudioContext();
   audio?.resume();
-  ring(false); // o atingere oprește alarma și în cooldown
+  if (document.body.classList.contains('alarm')) return ring(false); // atingerea doar oprește alarma, nu pornește meciul următor
   if (!can('timer')) return toast('Organizatorul a blocat cronometrul.');
   if (cooling()) return toast('Așteaptă câteva secunde: cronometrul tocmai a fost atins.');
   if (running()) return pauseDlg.showModal();                              // pauza are mereu o durată
@@ -670,13 +707,11 @@ goalDlg.addEventListener('click', e => {
     });
     // al doilea gol câștigă meciul: învinsa iese, intră echipa de pe margine, începe meciul următor.
     // Se calculează aici, pe starea de la momentul salvării (commit poate rula după un alt gol).
-    const sc = id => state.goals.filter(g => g.game === state.game && g.team === id).length;
-    const loser = team(state.playing.find(id => id !== t.id)), wait = state.teams.find(x => !state.playing.includes(x.id));
-    if (!state.playing.includes(t.id) || sc(t.id) < WIN) return toast(`⚽ Gol! ${p.name} (${t.name})`), navigator.vibrate?.(60);
-    toast(`🏆 ${t.name} câștigă ${sc(t.id)}–${sc(loser.id)}! Intră ${wait.name} în locul ${loser.name}.`);
+    const loser = team(state.playing.find(id => id !== t.id));
+    if (!state.playing.includes(t.id) || goalsOf(t.id) < WIN) return toast(`⚽ Gol! ${p.name} (${t.name})`), navigator.vibrate?.(60);
+    const score = `${goalsOf(t.id)}–${goalsOf(loser.id)}`, wait = swapIn(loser.id);
+    toast(`🏆 ${t.name} câștigă ${score}! Intră ${wait.name} în locul ${loser.name}. Porniți cronometrul când sunteți gata.`);
     navigator.vibrate?.([80, 60, 80, 60, 200]);
-    state.playing[state.playing.indexOf(loser.id)] = wait.id;
-    newGame();
     keepAwake(false);
   });
 });
@@ -1016,7 +1051,7 @@ function forbidden() {
   return Object.keys({ ...next, ...synced }).some(k => {
     if (next[k] === synced[k]) return false;
     if (k.startsWith('goals/')) return !can('goals') || synced[k] !== undefined; // spectatorul doar adaugă goluri
-    if (k === 'game' || k === 'playing') return !can('goals');                   // rotația vine din goluri
+    if (['game', 'playing', 'since'].includes(k)) return !can('goals');                   // rotația vine din goluri
     return k !== 'timer' || !can('timer');
   });
 }
@@ -1074,6 +1109,7 @@ function fromLive(f) {
   return {
     ...cleanMeta(raw), size, players, teams, playing, goals,
     game: Number.isInteger(raw.game) && raw.game >= 1 ? raw.game : 1,
+    since: Object.fromEntries(Object.entries(raw.since && typeof raw.since === 'object' ? raw.since : {}).filter(([k, v]) => tid.has(k) && Number.isInteger(v) && v >= 1)),
     timer: timer0({ startedAt: num(tm.startedAt), acc: Math.max(0, num(tm.acc) || 0), pauseUntil: num(tm.pauseUntil), at: num(tm.at) }),
   };
 }
@@ -1100,8 +1136,14 @@ function pull(sid, val) {
   const same = Object.keys(remote).length === Object.keys(synced).length && Object.keys(remote).every(k => remote[k] === synced[k]);
   if (same) return; // ecoul propriei scrieri
   synced = remote;
+  const prevGame = state.game, wasRunning = running();
   Object.assign(state, fromLive(remote));
   normalize(state);
+  // meciul s-a încheiat pe alt telefon (timp sau 2 goluri) cât mergea cronometrul aici: sună și aici
+  if (!first && state.game > prevGame && wasRunning) {
+    ring(true); keepAwake(false);
+    toast(`Meciul ${prevGame} s-a terminat. Pe teren: ${state.playing.map(id => team(id).name).join(' vs ')}. Porniți cronometrul când sunteți gata.`);
+  }
   if (!first) record('alt telefon');
   persist();
   if (first) toast(`Conectat la „${state.name}”.`);
