@@ -87,6 +87,11 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   username-ul devine `<username>@sintetic-pizdos.app`. Ceilalți sunt anonimi și spectatori: pot doar goluri, cronometru și lacăt
   (regulile din `database.rules.json`, lipite de mână în consolă). În aplicație: `state.mine` (local), `forbidden()`/`revert()` în `save()`,
   clasa `viewer` ascunde butoanele de editare. Sesiunile live mai vechi, fără `owner`, nu mai pot fi scrise.
+- Meci (2026-11-12, v2): cine ajunge la 2 goluri câștigă pe loc (`WIN`), învinsa iese, intră echipa de pe margine, meci nou.
+  Calculul e în mutația din `commit()` (rulează amânat, după animație). Spectatorii pot scrie și `game`/`playing` pentru rotație.
+  Cronometru: `timer = {startedAt, acc, pauseUntil, at}`; pauza se alege din 15/30/45/60 s și se termină singură
+  (`resumeAt()`, fără scriere); cooldown 5 s după orice apăsare, pentru toți (`at`). Pe telefon GOL și cronometrul sunt mari, unul lângă altul.
+- Încheiere live (organizator): „Încheie live pentru toți” șterge `live/<sid>`; ceilalți văd nodul gol și rămân cu copia locală.
 - Test live: două origini (`localhost:8080` și `:8081`, configurația `sintetic-pizdos-2` din `.claude/launch.json`) = două „telefoane”.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
