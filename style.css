@@ -387,3 +387,22 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 .viewer .team-name, .viewer .swatch { pointer-events: none; }
 .viewer .chip, .viewer .token { cursor: default; }
 #login .field { width: 100%; margin-bottom: 8px; }
+
+/* cronometru: pauză cu durată, cooldown */
+.timer small { font-size: 12px; color: var(--muted); font-weight: 700; }
+.timer small:empty { display: none; }
+.timer.cool, #timer-reset.cool { opacity: .5; }
+.pause-opts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pause-opts button { padding: 14px 0; font-size: 17px; font-weight: 800; }
+
+/* telefon: GOL și cronometrul mari, unul lângă altul */
+@media (max-width: 700px) {
+  .matchbar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
+  .timer { grid-area: 1 / 1; min-height: 68px; justify-content: center; padding: 8px; flex-wrap: wrap; gap: 4px 8px; }
+  .timer b { font-size: 32px; min-width: 0; }
+  .timer small { flex-basis: 100%; text-align: center; }
+  .goal-btn { grid-area: 1 / 2; min-height: 68px; font-size: 24px; padding: 8px; }
+  #timer-reset { grid-area: 2 / 1; padding: 10px; }
+  #new-game { grid-area: 2 / 2; margin: 0; padding: 10px; }
+  .pause-opts { grid-template-columns: 1fr 1fr; }
+}

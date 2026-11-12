@@ -33,7 +33,7 @@
       <div class="matchup" id="matchup"></div>
       <div class="matchbar">
         <span class="game-no" id="game-no"></span>
-        <button class="timer" id="timer"><span class="ico"></span><b id="clock">7:00</b></button>
+        <button class="timer" id="timer"><span class="ico"></span><b id="clock">7:00</b><small id="pause-left"></small></button>
         <button class="ghost-btn sm" id="timer-reset" title="Resetează cronometrul" aria-label="Resetează cronometrul">↺</button>
         <button class="goal-btn" id="goal-btn">⚽ GOL</button>
         <button class="ghost-btn sm" id="new-game">Meci nou</button>
@@ -136,6 +136,15 @@
       <input class="field" name="user" placeholder="Username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
       <input class="field" type="password" name="pass" placeholder="Parolă" autocomplete="current-password" required>
       <menu><span class="spacer"></span><button value="cancel" formnovalidate>Anulează</button><button value="ok" class="primary">Intră</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="pause">
+    <form method="dialog">
+      <h2>Ce pauză pui?</h2>
+      <p class="hint">Cronometrul pornește singur după pauză.</p>
+      <div class="pause-opts" id="pause-opts"></div>
+      <menu><span class="spacer"></span><button value="cancel">Anulează</button></menu>
     </form>
   </dialog>
 

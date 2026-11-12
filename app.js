@@ -23,6 +23,12 @@ const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const COLORS = ['#e63946', '#3a86ff', '#ffbe0b'];
+// Cronometrul: acc = ms scurși înainte de ultimul start; pauseUntil = pauza se termină singură atunci;
+// at = ultima apăsare (pentru cooldown). Toate în ora serverului.
+const timer0 = (o = {}) => ({ startedAt: null, acc: 0, pauseUntil: null, at: null, ...o });
+const WIN = 2;              // cine dă 2 goluri câștigă meciul pe loc
+const COOLDOWN = 5000;      // după o apăsare, cronometrul nu mai poate fi atins 5 s (de nimeni)
+const PAUSES = [15, 30, 45, 60];
 const today = () => new Date().toISOString().slice(0, 10);
 
 // O sesiune de sintetic = un meci (dată, oră, teren) cu jucătorii și echipele lui.
@@ -41,7 +47,7 @@ function normalize(s) {
   // meciul curent: număr, golurile înregistrate și cronometrul (acc = ms scurși înainte de ultimul start)
   s.game ||= 1;
   s.goals ||= [];
-  s.timer ||= { startedAt: null, acc: 0 };
+  s.timer = timer0(s.timer);
   s.matchMin ||= 7;
   for (const t of s.teams) {
     t.slots ||= t.members || []; delete t.members; // migrare din prima versiune
@@ -522,12 +528,17 @@ dlg.addEventListener('close', () => {
 const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const hhmm = ts => new Date(ts).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
 const dur = () => state.matchMin * 60000;
-const elapsed = () => state.timer.acc + (state.timer.startedAt ? now() - state.timer.startedAt : 0);
-const running = () => !!state?.timer.startedAt;
+// după pauză cronometrul merge singur de la pauseUntil, fără să scrie nimeni nimic
+const resumeAt = () => state.timer.pauseUntil && now() >= state.timer.pauseUntil ? state.timer.pauseUntil : null;
+const elapsed = () => { const t = state.timer, from = t.startedAt ?? resumeAt(); return t.acc + (from ? now() - from : 0); };
+const running = () => !!state && !!(state.timer.startedAt || resumeAt());
+const paused = () => !!state && !running() && !!state.timer.pauseUntil;
+const cooling = () => !!state?.timer.at && now() - state.timer.at < COOLDOWN;
+const setTimer = o => (state.timer = timer0({ at: now(), ...o }));
 
 function newGame() {
   state.game++;
-  state.timer = { startedAt: null, acc: 0 };
+  state.timer = timer0();
   ring(false);
 }
 
@@ -538,6 +549,9 @@ function tick() {
   $('#clock').textContent = mmss(left);
   $('#timer').classList.toggle('on', running());
   $('#timer').classList.toggle('done', left === 0);
+  $('#timer').classList.toggle('cool', cooling());
+  $('#timer-reset').classList.toggle('cool', cooling());
+  $('#pause-left').textContent = paused() ? `pauză ${mmss(state.timer.pauseUntil - now())}` : '';
   $('#timer').title = running() ? 'Pauză' : left === 0 ? 'Resetează cronometrul' : elapsed() ? 'Continuă' : 'Pornește cronometrul';
   // lacătul golului: ceilalți așteaptă, cel care îl ține vede cât mai are
   const other = lockedByOther(), btn = $('#goal-btn');
@@ -583,7 +597,7 @@ async function keepAwake(on) {
 document.addEventListener('visibilitychange', () => { lock = null; if (!document.hidden && running()) keepAwake(true); });
 
 function finish() {
-  state.timer = { startedAt: null, acc: dur() };
+  state.timer = timer0({ acc: dur() });
   save();
   tick();
   keepAwake(false);
@@ -594,18 +608,28 @@ function finish() {
 $('#timer').addEventListener('click', () => {
   audio ||= window.AudioContext && new AudioContext();
   audio?.resume();
-  ring(false);
-  const t = state.timer;
-  if (running()) state.timer = { startedAt: null, acc: elapsed() };      // pauză
-  else if (elapsed() >= dur()) state.timer = { startedAt: null, acc: 0 }; // gata: înapoi la 7:00
-  else t.startedAt = now();                                              // start / continuă
+  ring(false); // o atingere oprește alarma și în cooldown
+  if (cooling()) return toast('Așteaptă câteva secunde: cronometrul tocmai a fost atins.');
+  if (running()) return pauseDlg.showModal();                              // pauza are mereu o durată
+  if (elapsed() >= dur()) setTimer({ acc: 0 });                            // gata: înapoi la 7:00
+  else setTimer({ startedAt: now(), acc: elapsed() });                     // start / continuă (și oprirea pauzei)
   keepAwake(running());
   save();
   tick();
 });
+const pauseDlg = $('#pause');
+$('#pause-opts').innerHTML = PAUSES.map(n => `<button value="${n}" class="ghost-btn">${n} s</button>`).join('');
+pauseDlg.addEventListener('close', () => {
+  const n = +pauseDlg.returnValue;
+  pauseDlg.returnValue = '';
+  if (!PAUSES.includes(n) || !running() || cooling()) return;
+  setTimer({ acc: elapsed(), pauseUntil: now() + n * 1000 });
+  save(); tick();
+});
 $('#timer-reset').addEventListener('click', () => {
-  if (running() && !confirm('Oprești și resetezi cronometrul?')) return;
-  state.timer = { startedAt: null, acc: 0 };
+  if (cooling()) return toast('Așteaptă câteva secunde: cronometrul tocmai a fost atins.');
+  if ((running() || paused()) && !confirm('Oprești și resetezi cronometrul?')) return;
+  setTimer({});
   ring(false); keepAwake(false); save(); tick();
 });
 $('#new-game').addEventListener('click', () => {
@@ -634,12 +658,22 @@ goalDlg.addEventListener('click', e => {
   if (!b) return;
   const p = player(b.dataset.scorer), t = team(b.dataset.team);
   goalDlg.close();
-  commit(() => state.goals.push({
-    id: uid(), player: p.id, team: t.id, vs: [...state.playing], game: state.game,
-    at: now(), t: elapsed() ? Math.round(elapsed()) : null,
-  }));
-  navigator.vibrate?.(60);
-  toast(`⚽ Gol! ${p.name} (${t.name})`);
+  commit(() => {
+    state.goals.push({
+      id: uid(), player: p.id, team: t.id, vs: [...state.playing], game: state.game,
+      at: now(), t: elapsed() ? Math.round(elapsed()) : null,
+    });
+    // al doilea gol câștigă meciul: învinsa iese, intră echipa de pe margine, începe meciul următor.
+    // Se calculează aici, pe starea de la momentul salvării (commit poate rula după un alt gol).
+    const sc = id => state.goals.filter(g => g.game === state.game && g.team === id).length;
+    const loser = team(state.playing.find(id => id !== t.id)), wait = state.teams.find(x => !state.playing.includes(x.id));
+    if (!state.playing.includes(t.id) || sc(t.id) < WIN) return toast(`⚽ Gol! ${p.name} (${t.name})`), navigator.vibrate?.(60);
+    toast(`🏆 ${t.name} câștigă ${sc(t.id)}–${sc(loser.id)}! Intră ${wait.name} în locul ${loser.name}.`);
+    navigator.vibrate?.([80, 60, 80, 60, 200]);
+    state.playing[state.playing.indexOf(loser.id)] = wait.id;
+    newGame();
+    keepAwake(false);
+  });
 });
 
 function renderGoals() {
@@ -848,7 +882,8 @@ function fillMenu() {
     ? `<p><b class="live-dot${online ? '' : ' off'}">LIVE</b> ${!online ? 'Fără semnal: modificările se trimit când revine.'
         : viewer() ? 'Ești spectator: poți înregistra goluri și porni cronometrul.' : 'Ești organizatorul. Colegii cu linkul pot înregistra goluri și porni cronometrul.'}</p>
        <div class="actions"><button type="button" class="primary" data-act="live-share">Trimite linkul</button>
-       <button type="button" class="ghost-btn" data-act="live-off">Oprește live pe acest dispozitiv</button></div>`
+       ${state.mine ? '<button type="button" class="ghost-btn danger" data-act="live-end">Încheie live pentru toți</button>'
+         : '<button type="button" class="ghost-btn" data-act="live-off">Ieși din live</button>'}</div>`
     : `<button type="button" class="primary" data-act="live-on">📡 Pune online${org ? '' : ' (organizator)'}</button>
        <p class="hint">Primești un link: colegii văd live echipele și pot înregistra goluri și porni cronometrul.</p>`)
     + (org ? `<button type="button" class="ghost-btn sm" data-act="logout">Ieși din contul de organizator</button>` : '');
@@ -906,6 +941,15 @@ smDlg.addEventListener('click', async e => {
   }
   if (act === 'logout') { await fb.auth.signOut(fb.au); fb.me = null; toast('Ai ieșit din contul de organizator.'); return fillMenu(); }
   if (act === 'live-share') return shareLink();
+  if (act === 'live-end') {
+    if (!confirm('Închei sesiunea live? Fiecare rămâne cu copia locală, iar sesiunea se șterge de pe server.')) return;
+    const sid = state.live;
+    // întâi ne dezabonăm, ca ștergerea să nu apară aici ca „încheiată de organizator”
+    Object.assign(state, { live: null, mine: false }); persist(); goLive(); render();
+    try { await fb.remove(fb.ref(fb.db, `live/${sid}`)); toast('Sesiunea live s-a încheiat. Acum e locală.'); }
+    catch { toast('Nu am putut șterge sesiunea de pe server.'); }
+    return fillMenu();
+  }
   if (act === 'live-off') {
     if (!confirm('Sesiunea rămâne pe acest dispozitiv, dar nu se mai sincronizează. Continui?')) return;
     state.live = null; persist(); goLive(); render();
@@ -958,11 +1002,11 @@ let fb = null, subs = [], synced = {}, ready = false, online = false, offset = 0
 let goalLock = null, myLock = 0; // lacătul de pe server; până când îl țin eu (ora serverului)
 const now = () => Date.now() + offset; // ora serverului, ca cronometrul să arate la fel pe toate telefoanele
 const viewer = () => !!state?.live && !state.mine;
-// Spectatorul a schimbat ceva în afară de goluri și cronometru? Serverul ar refuza, deci revenim la ce e pe server.
+// Spectatorul a schimbat ceva în afară de goluri, cronometru și rotație? Serverul ar refuza, deci revenim la ce e pe server.
 function forbidden() {
   if (!viewer() || !ready) return false;
   const next = flat(state);
-  return Object.keys({ ...next, ...synced }).some(k => next[k] !== synced[k] && k !== 'timer' && !k.startsWith('goals/'));
+  return Object.keys({ ...next, ...synced }).some(k => next[k] !== synced[k] && !['timer', 'game', 'playing'].includes(k) && !k.startsWith('goals/'));
 }
 function revert() {
   Object.assign(state, fromLive(synced));
@@ -1018,7 +1062,7 @@ function fromLive(f) {
   return {
     ...cleanMeta(raw), size, players, teams, playing, goals,
     game: Number.isInteger(raw.game) && raw.game >= 1 ? raw.game : 1,
-    timer: { startedAt: num(tm.startedAt), acc: Math.max(0, num(tm.acc) || 0) },
+    timer: timer0({ startedAt: num(tm.startedAt), acc: Math.max(0, num(tm.acc) || 0), pauseUntil: num(tm.pauseUntil), at: num(tm.at) }),
   };
 }
 
@@ -1034,8 +1078,9 @@ function push() {
 
 function pull(sid, val) {
   if (state?.live !== sid) return;
-  if (!val) { // nimic pe server: linkul e greșit sau sesiunea a fost ștearsă
-    if (!ready) { toast('Sesiunea live nu există.'); state.live = null; persist(); goLive(); render(); }
+  if (!val) { // nimic pe server: linkul e greșit sau organizatorul a încheiat live-ul
+    toast(ready ? 'Organizatorul a încheiat sesiunea live. A rămas pe telefonul tău.' : 'Sesiunea live nu mai există.');
+    Object.assign(state, { live: null, mine: false }); persist(); goLive(); render();
     return;
   }
   const remote = flatVal(val), first = !ready;
