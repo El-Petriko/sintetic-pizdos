@@ -69,12 +69,21 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 - Meci (2026-11-12): bară cu cronometru (`matchMin`, implicit 7; `timer = {startedAt, acc}` salvat în sesiune, supraviețuiește reload-ului),
   alarmă Web Audio în 3 reprize + vibrație + clipire, Wake Lock cât merge; GOL → dialog cu jucătorii celor 2 echipe de pe teren,
   gol = `{player, team, vs, game, at, t}`; scorul meciului curent în locul lui „VS”; meci nou la „Meci nou” sau la intrarea echipei de pe margine.
+- Firebase (2026-11-12): proiect `sintetic-pizdos` (plan Spark, fără card), Realtime Database europe-west1, Auth anonim activ,
+  domeniu autorizat `el-petriko.github.io`. Reguli: citire/scriere doar în `live/$sid` cu `$sid.length >= 20` și `auth != null`;
+  testate prin REST (8/8: scrie/citește în sesiune, refuză cod scurt, listare, altă cale, fără auth).
+  Config web (publică, nu e secret): apiKey `AIzaSyDCospd_YB6tC24GdRMh58hOq8jCAsRVBo`, authDomain `sintetic-pizdos.firebaseapp.com`,
+  databaseURL `https://sintetic-pizdos-default-rtdb.europe-west1.firebasedatabase.app`, projectId `sintetic-pizdos`, appId `1:448897182271:web:d4cf811e0171a52f3aa68a`.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
-- Feedback pe telefonul real după reparații (drag ținut apăsat, scroll; captura din 12:33 era versiunea veche din cache).
 - PWA (manifest, offline), dacă e nevoie.
-- Apoi: buton „Distribuie” (link/imagine cu echipele, varianta A).
+- **Următorul: sesiune live (Firebase).** Cerință: organizatorul apasă „Pune online” în meniul sesiunii → link
+  `…/sintetic/#live=<id ≥20 caractere aleatorii>`; colegii deschid linkul și văd/modifică live (echipe, goluri, cronometru) cele 2 ore;
+  oricine are linkul poate modifica (eventual mai târziu: link de organizator vs. link de bancă). Fără semnal: local, apoi se trimite.
+  Design propus: SDK Firebase modular din CDN (gstatic, versiune fixă), auth anonim, sesiunea în `live/<id>`; golurile ca listă
+  (`push`, nu suprascriere), restul pe câmpuri; cronometrul prin `startedAt` (ora serverului, `serverTimeOffset`); sesiunea rămâne și local.
+- Apoi: buton „Distribuie” cu link static/imagine (opțional, live-ul îl acoperă).
 - Idei: oră/teren deja în sesiune; rotația echipelor; scor.
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.
