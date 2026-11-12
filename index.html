@@ -21,6 +21,9 @@
     <aside class="panel pool" data-zone="pool">
       <div class="panel-head">
         <h2>Jucători <span class="count" id="pool-count"></span></h2>
+        <button class="ghost-btn sm" id="import" title="Importă jucători dintr-un fișier .json">Import</button>
+        <button class="ghost-btn sm" id="export" title="Salvează jucătorii într-un fișier .json">Export</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
         <button class="primary" id="add">+ Adaugă</button>
       </div>
       <div class="list" id="pool"></div>
@@ -59,6 +62,7 @@
   </div>
 
   <div class="selbar" id="selbar" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status"></div>
 
   <dialog id="editor">
     <form method="dialog">

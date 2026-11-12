@@ -320,6 +320,66 @@ $('#teams').addEventListener('input', e => { // culoarea se vede live cât tragi
   document.querySelectorAll(`[data-zone="${e.target.dataset.team}"]`).forEach(z => z.style.setProperty('--team', e.target.value));
 });
 
+/* ---------- import / export jucători ---------- */
+// Fișier: {"format": "sintetic-jucatori", "version": 1, "players": [{"name": "Andrei Pop", "pos": "P", "photo": "data:image/jpeg;base64,..."}]}
+// La import se acceptă și o listă simplă; "pos" poate fi P/F/M/A sau cuvântul întreg („Fundaș”); "photo" e opțional.
+const FORMAT = 'sintetic-jucatori';
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t.timer);
+  t.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// Fișierul vine din afară: păstrăm doar câmpurile cunoscute, cu valori sigure.
+function cleanPlayer(p) {
+  const name = typeof p?.name === 'string' ? p.name.trim().slice(0, 24) : '';
+  if (!name) return null;
+  const k = typeof p.pos === 'string' ? p.pos.trim()[0]?.toUpperCase() : '';
+  const pos = k && POS_ORDER.includes(k) ? k : 'M';
+  const ok = typeof p.photo === 'string' && p.photo.length < 300000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(p.photo);
+  return ok ? { name, pos, photo: p.photo } : { name, pos };
+}
+
+$('#export').addEventListener('click', () => {
+  if (!state.players.length) return toast('Nu ai jucători de exportat.');
+  const data = { format: FORMAT, version: 1, players: state.players.map(({ name, pos, photo }) => photo ? { name, pos, photo } : { name, pos }) };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = `jucatori-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+$('#import').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  let list;
+  try {
+    const d = JSON.parse(await f.text());
+    list = Array.isArray(d) ? d : d.players;
+    if (!Array.isArray(list)) throw 0;
+  } catch { return toast('Fișierul nu e o listă de jucători validă.'); }
+  const clean = list.map(cleanPlayer).filter(Boolean);
+  if (!clean.length) return toast('Nu am găsit niciun jucător în fișier.');
+
+  // după nume: cine există deja e actualizat, ceilalți sunt adăugați; nimeni nu e șters
+  const byName = n => state.players.find(q => q.name.toLowerCase() === n.toLowerCase());
+  const updated = clean.filter(p => byName(p.name)).length;
+  commit(() => {
+    for (const p of clean) {
+      const old = byName(p.name);
+      if (old) Object.assign(old, p);
+      else state.players.push({ id: uid(), photo: null, ...p });
+    }
+  });
+  toast(`Import: ${clean.length - updated} adăugați, ${updated} actualizați.`);
+});
+
 /* ---------- editor ---------- */
 const dlg = $('#editor');
 let editing = null, photo = null;
