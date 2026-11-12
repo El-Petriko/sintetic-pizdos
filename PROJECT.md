@@ -74,16 +74,23 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   testate prin REST (8/8: scrie/citește în sesiune, refuză cod scurt, listare, altă cale, fără auth).
   Config web (publică, nu e secret): apiKey `AIzaSyDCospd_YB6tC24GdRMh58hOq8jCAsRVBo`, authDomain `sintetic-pizdos.firebaseapp.com`,
   databaseURL `https://sintetic-pizdos-default-rtdb.europe-west1.firebasedatabase.app`, projectId `sintetic-pizdos`, appId `1:448897182271:web:d4cf811e0171a52f3aa68a`.
+- Live (2026-11-12): meniul sesiunii → „📡 Pune online” → link `#live=<32 caractere>`; deschis pe alt telefon creează/reia sesiunea
+  și o umple de pe server. Firebase 10.12.2 din gstatic, încărcat doar pentru sesiuni live. Pe server `live/<sid>/d`: fiecare bucată e text JSON
+  cu chei sortate (`players/<id>`, `goals/<id>`, `teams/t0..t2`, restul câmpurilor direct); se trimite doar diferența față de `synced`.
+  Datele primite trec prin `fromLive()` (validare ca la import). Înainte de primul răspuns de la server nu se trimite nimic (altfel o copie veche
+  ar suprascrie). Cronometrul folosește ora serverului (`now()` = `Date.now() + serverTimeOffset`). Fără semnal: SDK-ul ține scrierile până revine.
+  Randarea din live așteaptă cât tragi un jucător sau scrii într-un câmp.
+- Lacăt la gol (2026-11-12): `live/<sid>/lock = {by: uid anonim, until}`, luat prin tranzacție, 45 s. Ceilalți au butonul dezactivat
+  („⏳ Gol în curs · 0:38”); cel care îl ține vede „Mai ai 0:38”, iar la expirare dialogul se închide. Se eliberează la închiderea dialogului.
+  Fără semnal golul se înregistrează local, fără lacăt.
+- Test live: două origini (`localhost:8080` și `:8081`, configurația `sintetic-pizdos-2` din `.claude/launch.json`) = două „telefoane”.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
 - PWA (manifest, offline), dacă e nevoie.
-- **Următorul: sesiune live (Firebase).** Cerință: organizatorul apasă „Pune online” în meniul sesiunii → link
-  `…/sintetic/#live=<id ≥20 caractere aleatorii>`; colegii deschid linkul și văd/modifică live (echipe, goluri, cronometru) cele 2 ore;
-  oricine are linkul poate modifica (eventual mai târziu: link de organizator vs. link de bancă). Fără semnal: local, apoi se trimite.
-  Design propus: SDK Firebase modular din CDN (gstatic, versiune fixă), auth anonim, sesiunea în `live/<id>`; golurile ca listă
-  (`push`, nu suprascriere), restul pe câmpuri; cronometrul prin `startedAt` (ora serverului, `serverTimeOffset`); sesiunea rămâne și local.
+- **Următorul:** test live pe 2 telefoane reale, pe Pages (după push). De urmărit: lacătul, cronometrul pe ora serverului, revenirea după fără semnal.
+- Live, mai târziu: link de organizator vs. link de bancă; ștergerea automată a sesiunilor vechi de pe server (acum rămân în `live/`).
 - Apoi: buton „Distribuie” cu link static/imagine (opțional, live-ul îl acoperă).
 - Idei: oră/teren deja în sesiune; rotația echipelor; scor.
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.
