@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sintetic</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="ball">⚽</span> Sintetic</div>
+    <div class="seg" id="size" role="radiogroup" aria-label="Jucători pe echipă">
+      <button data-size="5">5 × 5</button>
+      <button data-size="6">6 × 6</button>
+    </div>
+    <button class="ghost-btn" id="clear">Golește echipele</button>
+  </header>
+
+  <div class="layout">
+    <aside class="panel pool" data-zone="pool">
+      <div class="panel-head">
+        <h2>Jucători <span class="count" id="pool-count"></span></h2>
+        <button class="primary" id="add">+ Adaugă</button>
+      </div>
+      <div class="list" id="pool"></div>
+    </aside>
+
+    <main>
+      <div class="matchup" id="matchup"></div>
+      <div class="pitch">
+        <svg viewBox="0 0 1000 500" aria-hidden="true">
+          <defs>
+            <pattern id="stripes" width="125" height="500" patternUnits="userSpaceOnUse">
+              <rect width="62.5" height="500" fill="#ffffff0a"/>
+            </pattern>
+          </defs>
+          <rect width="1000" height="500" fill="url(#stripes)"/>
+          <g fill="none" stroke="#ffffffb0" stroke-width="3">
+            <rect x="20" y="20" width="960" height="460" rx="6"/>
+            <line x1="500" y1="20" x2="500" y2="480"/>
+            <circle cx="500" cy="250" r="62"/>
+            <path d="M20 130 A120 120 0 0 1 20 370"/>
+            <path d="M980 130 A120 120 0 0 0 980 370"/>
+            <rect x="6" y="210" width="14" height="80"/>
+            <rect x="980" y="210" width="14" height="80"/>
+          </g>
+          <g fill="none" stroke="#ffffffb0" stroke-width="3">
+            <path d="M20 36 A16 16 0 0 0 36 20"/><path d="M964 20 A16 16 0 0 0 980 36"/>
+            <path d="M980 464 A16 16 0 0 0 964 480"/><path d="M36 480 A16 16 0 0 0 20 464"/>
+          </g>
+          <g fill="#ffffffb0"><circle cx="500" cy="250" r="5"/><circle cx="105" cy="250" r="4"/><circle cx="895" cy="250" r="4"/></g>
+        </svg>
+        <div id="halves"></div>
+      </div>
+      <div class="bench" id="bench"></div>
+      <div class="teams" id="teams"></div>
+    </main>
+  </div>
+
+  <dialog id="editor">
+    <form method="dialog">
+      <h2 id="editor-title">Jucător nou</h2>
+      <label class="photo-pick">
+        <input type="file" accept="image/*" id="photo" hidden>
+        <span class="av big" id="photo-preview"></span>
+        <small>Alege poza</small>
+      </label>
+      <input name="name" id="name" required maxlength="24" placeholder="Nume" autocomplete="off">
+      <div class="seg pos-pick" role="radiogroup" aria-label="Poziție preferată">
+        <label><input type="radio" name="pos" value="P"><span>Portar</span></label>
+        <label><input type="radio" name="pos" value="F"><span>Fundaș</span></label>
+        <label><input type="radio" name="pos" value="M" checked><span>Mijlocaș</span></label>
+        <label><input type="radio" name="pos" value="A"><span>Atacant</span></label>
+      </div>
+      <menu>
+        <button value="delete" class="danger" id="delete" formnovalidate>Șterge</button>
+        <span class="spacer"></span>
+        <button value="cancel" formnovalidate>Anulează</button>
+        <button value="ok" class="primary">Salvează</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
