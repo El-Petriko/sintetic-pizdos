@@ -95,6 +95,12 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   pe teren de mai mult timp (`since[echipă]` = meciul în care a intrat; la primul meci iese prima echipă). Cronometrul rămâne oprit
   la 7:00 până îl pornește cineva; atingerea pe alarmă doar o oprește. Telefoanele care primesc rotația de la altul sună și ele.
   Alarmă scurtă (o repriză) când timpul trece de 1:00.
+- Interval (2026-11-12): `windowOf()` din data + de la/până la (fără final: 2 h; fără start: fără restricție). În afara lui spectatorii
+  văd tot, dar `can()` e fals; organizatorul scrie `live/<sid>/window = {from, to}`, iar regulile compară cu `now` (ora serverului).
+  Countdown deasupra cronometrului: „Începe în …” / „Sesiunea s-a încheiat la …”.
+- Istoric meciuri: la fiecare final (`closeMatch`: „2 goluri”, „timp”, „manual”) o fișă în `state.matches` (echipe, jucători, scor,
+  câștigătoare, cine a ieșit, durata), sincronizată ca golurile (`matches/m<N>`, spectatorii doar adaugă). Telefonul organizatorului
+  copiază sesiunea fără poze în `arhiva/<id sesiune>` (doar contul lui citește/scrie). Statistici: deocamdată doar se strâng.
 - Încheiere live (organizator): „Încheie live pentru toți” șterge `live/<sid>`; ceilalți văd nodul gol și rămân cu copia locală.
 - Panou organizator (🛡 în antet, ascuns spectatorilor): istoric local (`state.history`, ultimele 25 de „poze” ale meciului:
   goluri, meci, cine joacă, locuri, cronometru) cu „Readu aici”; timp rămas ±10 s / ±1 min; permisiuni `live/<sid>/perm`
