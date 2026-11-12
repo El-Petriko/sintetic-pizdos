@@ -21,6 +21,9 @@
           },
           "playing": {
             ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+          },
+          "since": {
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
           }
         },
         "lock": {
