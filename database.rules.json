@@ -8,12 +8,24 @@
           ".write": "auth != null && $sid.length >= 20 && !data.exists() && auth.uid === 'rYXL1ZGGjdhs39mDCvVXd1IIzKs1' && newData.val() === auth.uid"
         },
         "d": {
-          "goals": { ".write": "auth != null && root.child('live').child($sid).child('owner').exists()" },
-          "timer": { ".write": "auth != null && root.child('live').child($sid).child('owner').exists()" },
-          "game": { ".write": "auth != null && root.child('live').child($sid).child('owner').exists()" },
-          "playing": { ".write": "auth != null && root.child('live').child($sid).child('owner').exists()" }
+          "goals": {
+            "$g": {
+              ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false && !data.exists()"
+            }
+          },
+          "timer": {
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('timer').val() !== false"
+          },
+          "game": {
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+          },
+          "playing": {
+            ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+          }
         },
-        "lock": { ".write": "auth != null && root.child('live').child($sid).child('owner').exists()" }
+        "lock": {
+          ".write": "auth != null && root.child('live').child($sid).child('owner').exists() && root.child('live').child($sid).child('perm').child('goals').val() !== false"
+        }
       }
     }
   }
