@@ -143,7 +143,7 @@ const when = s => [fmtDate(s.date), [s.start, s.end].filter(Boolean).join('–')
 function render() {
   $('#s-name').textContent = state.name;
   $('#s-meta').textContent = [when(state), state.venue].filter(Boolean).join(' · ');
-  document.title = `${state.name} · Sintetic`;
+  document.title = `${state.name} · sintetic-pizdos`;
   document.querySelectorAll('#size button').forEach(b => b.classList.toggle('on', +b.dataset.size === state.size));
 
   // teren: playing[0] în stânga, playing[1] în dreapta, a treia echipă pe margine

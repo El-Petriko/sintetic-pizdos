@@ -1,6 +1,6 @@
 # sintetic-pizdos — manager de echipe pentru fotbal pe sintetic
 
-Start: 2026-11-12 · Sesiuni: `sessions/2026-11-12_01_fotbal-sintetic/`
+Start: 2026-11-12 · Sesiuni: `sessions/2026-11-12_01_sintetic-pizdos/`
 
 ## Descriere
 Aplicație pentru meciuri de fotbal pe sintetic: 3 echipe de câte 5 sau 6 jucători.
