@@ -117,3 +117,6 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
 - Apoi: buton „Distribuie” cu link static/imagine (opțional, live-ul îl acoperă).
 - Idei: oră/teren deja în sesiune; rotația echipelor; scor.
 - Mai târziu: layout de telefon, rotație automată (câștigătoarea rămâne, la egal iese echipa veche), scor/cronometru.
+- UI telefon (2026-11-15): paleta „Noapte neon” (bleumarin, accent `#c6ff3d`, echipe implicite roz/cyan/galben), câte un buton GOL
+  pe echipă (`#goal-btns`, randat în `render()`; foaia de gol arată doar echipa apăsată), cronometru cu bară de progres (`--p`) și clasa `last`
+  în ultimul minut; pe telefon tabelă de scor, cronometru 150px și GOL 140px. Mockup: `sessions/2026-11-15_02_sintetic-ui-telefon/mockup.html`.
