@@ -22,7 +22,7 @@ const esc = s => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-const COLORS = ['#e63946', '#3a86ff', '#ffbe0b'];
+const COLORS = ['#ff4f81', '#3dd6ff', '#ffbe0b'];
 // Cronometrul: acc = ms scurși înainte de ultimul start; pauseUntil = pauza se termină singură atunci;
 // at = ultima apăsare (pentru cooldown). Toate în ora serverului.
 const timer0 = (o = {}) => ({ startedAt: null, acc: 0, pauseUntil: null, at: null, ...o });
@@ -168,6 +168,7 @@ function render() {
   const score = t => state.goals.filter(g => g.game === state.game && g.team === t.id).length;
   $('#matchup').innerHTML = side(L, 'l') + `<span class="vs score" title="Meciul ${state.game}">${score(L)} – ${score(R)}</span>` + side(R, 'r');
   $('#game-no').textContent = `Meci ${state.game}`;
+  $('#goal-btns').innerHTML = [L, R].map(t => `<button class="goal-btn" data-goal="${t.id}" style="--team:${t.color}"><b>GOL</b><small>${esc(t.name)}</small></button>`).join('');
   renderGoals();
   tick();
   $('#bench').innerHTML = `<i style="background:${wait.color}"></i>Pe margine: <b>${esc(wait.name)}</b>
@@ -595,14 +596,19 @@ function tick() {
   $('#timer').classList.toggle('done', left === 0);
   $('#timer').classList.toggle('cool', cooling());
   $('#timer-reset').classList.toggle('cool', cooling());
-  $('#pause-left').textContent = paused() ? `pauză ${mmss(state.timer.pauseUntil - now())}` : '';
+  $('#timer').classList.toggle('last', running() && left <= 60);
+  $('#timer').style.setProperty('--p', `${left / dur() * 100}%`);
+  $('#pause-left').textContent = paused() ? `pauză ${mmss(state.timer.pauseUntil - now())}` : !can('timer') ? ''
+    : running() ? (left <= 60 ? 'ultimul minut' : 'atinge pentru pauză') : left === 0 ? 'gata timpul' : elapsed() ? 'atinge să continui' : 'atinge ca să pornești';
   $('#timer').title = running() ? 'Pauză' : left === 0 ? 'Resetează cronometrul' : elapsed() ? 'Continuă' : 'Pornește cronometrul';
   // lacătul golului: ceilalți așteaptă, cel care îl ține vede cât mai are
-  const other = lockedByOther(), btn = $('#goal-btn');
-  btn.disabled = other || !can('goals');
+  const other = lockedByOther();
+  document.querySelectorAll('.goal-btn').forEach(b => {
+    b.disabled = other || !can('goals');
+    b.querySelector('b').textContent = other ? `⏳ ${mmss(goalLock.until - now())}` : 'GOL';
+  });
   $('#timer').classList.toggle('locked', !can('timer'));
   if (orgDlg.open) $('#org-clock').textContent = mmss(left);
-  btn.textContent = other ? `⏳ Gol în curs · ${mmss(goalLock.until - now())}` : '⚽ GOL';
   if (myLock && goalDlg.open) {
     if (now() >= myLock) { goalDlg.close(); toast('Au trecut 45 de secunde, golul nu s-a înregistrat.'); }
     else $('#goal-left').textContent = `Mai ai ${mmss(myLock - now())}`;
@@ -703,17 +709,20 @@ $('#new-game').addEventListener('click', () => {
 });
 
 const goalDlg = $('#goal');
-$('#goal-btn').addEventListener('click', async () => {
+$('#goal-btns').addEventListener('click', async e => {
+  const scorer = e.target.closest('[data-goal]');
+  if (!scorer) return;
   if (!can('goals')) return toast('Organizatorul a blocat golurile.');
   if (!(await takeLock())) return toast('Altcineva înregistrează deja un gol.');
   $('#goal-left').textContent = '';
-  const cols = state.playing.map(team).map(t => {
+  const cols = [team(scorer.dataset.goal)].map(t => {
     const ps = t.slots.filter(Boolean).map(player);
     return `<div class="goal-col" style="--team:${t.color}"><h3><i></i>${esc(t.name)}</h3>${ps.length
       ? ps.map(p => `<button type="button" class="scorer" data-scorer="${p.id}" data-team="${t.id}">${avatar(p)}<span>${esc(p.name)}</span></button>`).join('')
       : '<p class="hint">Niciun jucător în echipă.</p>'}</div>`;
   });
   $('#goal-cols').innerHTML = cols.join('');
+  goalDlg.querySelector('h2').textContent = `⚽ Gol ${team(scorer.dataset.goal).name} · cine a marcat?`;
   $('#goal-time').textContent = `${hhmm(Date.now())}${elapsed() ? ` · minutul ${mmss(elapsed())}` : ''} · meciul ${state.game}`;
   goalDlg.showModal();
 });

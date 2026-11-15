@@ -1,12 +1,13 @@
 :root {
-  --bg: #0c1210;
-  --panel: #141d19;
-  --panel-2: #1b2621;
-  --line: #26352e;
-  --text: #e8efe9;
-  --muted: #8a9a91;
-  --accent: #3ddc84;
+  --bg: #0b0f1a;
+  --panel: #121829;
+  --panel-2: #1a2238;
+  --line: #263152;
+  --text: #eef1ff;
+  --muted: #8b93b5;
+  --accent: #c6ff3d;
   --danger: #ff5d5d;
+  --warn: #ffb020;
   --P: #f4b740; --F: #4c9bff; --M: #3ddc84; --A: #ff6b6b;
   --r: 12px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -15,7 +16,7 @@
 * { box-sizing: border-box; }
 body {
   margin: 0; min-height: 100vh; color: var(--text);
-  background: radial-gradient(1200px 600px at 70% -10%, #17322a 0%, transparent 60%), var(--bg);
+  background: radial-gradient(1200px 600px at 70% -10%, #c6ff3d14 0%, transparent 60%), var(--bg);
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 
@@ -42,11 +43,11 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
   display: block; padding: 6px 14px; border-radius: 999px; background: none;
   color: var(--muted); font-weight: 600; font-size: 14px; transition: background .2s, color .2s;
 }
-.seg button.on, .seg input:checked + span { background: var(--accent); color: #062312; }
+.seg button.on, .seg input:checked + span { background: var(--accent); color: #1a2600; }
 .seg label { cursor: pointer; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 
-.primary { background: var(--accent); color: #062312; font-weight: 700; padding: 8px 14px; border-radius: 10px; transition: filter .15s, transform .1s; }
+.primary { background: var(--accent); color: #1a2600; font-weight: 700; padding: 8px 14px; border-radius: 10px; transition: filter .15s, transform .1s; }
 .primary:hover { filter: brightness(1.1); }
 .primary:active, .ghost-btn:active { transform: scale(.97); }
 .ghost-btn { background: none; border: 1px solid var(--line); color: var(--muted); padding: 7px 14px; border-radius: 10px; transition: color .15s, border-color .15s; }
@@ -83,7 +84,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 .team.full .count { color: var(--accent); }
 
 /* drop feedback */
-.over { border-color: var(--accent); box-shadow: 0 0 0 3px #3ddc8433; }
+.over { border-color: var(--accent); box-shadow: 0 0 0 3px #c6ff3d33; }
 .team.over { border-top-color: var(--team); }
 .reject { animation: shake .35s; }
 @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
@@ -112,7 +113,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .pitch {
   position: relative; aspect-ratio: 2; max-height: 62vh; width: 100%; margin: 0 auto;
   border-radius: 16px; overflow: hidden;
-  background: radial-gradient(ellipse at 50% 40%, #2a8f55, #1c6b3d 70%, #175a33);
+  background: radial-gradient(ellipse at 50% 40%, #23705a, #1c5d4a 70%, #174d3e);
   box-shadow: inset 0 0 60px #0006, 0 10px 30px #0006;
 }
 .pitch svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -128,14 +129,14 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 }
 .token .disc {
   position: relative; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
-  border: 3px solid var(--team); background: #0d1a14; box-shadow: 0 6px 14px #0007; transition: transform .15s;
+  border: 3px solid var(--team); background: #0f1526; box-shadow: 0 6px 14px #0007; transition: transform .15s;
 }
 .token .av { width: 100%; height: 100%; font-size: 16px; }
 .token .pos { position: absolute; top: -4px; right: -6px; width: 18px; height: 18px; font-size: 10px; border-radius: 5px; box-shadow: 0 2px 6px #0008; }
 .token:hover .disc { transform: scale(1.06); }
 .token .tname {
   font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
-  background: #0b120ecc; color: var(--text);
+  background: #0b0f1acc; color: var(--text);
 }
 [data-pitch="R"] .token { left: calc((1 - var(--px)) * 100%); }
 .token.empty { cursor: default; }
@@ -150,7 +151,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
   cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: border-color .15s, transform .15s;
 }
-.chip:hover { border-color: #3a4d43; }
+.chip:hover { border-color: #36437a; }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dragging { opacity: .25; }
 .chip.target, .slot-empty.target { border-color: var(--accent); transform: scale(1.02); }
@@ -165,7 +166,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .av {
   width: 34px; height: 34px; border-radius: 50%; flex: none; object-fit: cover;
   display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #cfe;
-  background: linear-gradient(135deg, #2c4a3d, #1d2f27); -webkit-user-drag: none;
+  background: linear-gradient(135deg, #2a3558, #1a2238); -webkit-user-drag: none;
 }
 .av.big { width: 96px; height: 96px; font-size: 32px; }
 img.av { display: block; }
@@ -244,7 +245,7 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 50;
   translate: -50% 0; width: min(520px, calc(100vw - 32px));
   display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 10px;
-  background: #1f2c26ee; backdrop-filter: blur(10px); border: 1px solid var(--accent); border-radius: 14px;
+  background: #1a2238ee; backdrop-filter: blur(10px); border: 1px solid var(--accent); border-radius: 14px;
   box-shadow: 0 12px 40px #000c; transition: opacity .2s, translate .2s;
 }
 .selbar:empty { opacity: 0; translate: -50% 20px; pointer-events: none; }
@@ -271,7 +272,6 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
   .pool { order: 6; position: static; max-height: none; }
   .teams { order: 7; grid-template-columns: minmax(0, 1fr); }
   .game-no { display: none; }
-  .goal-btn { flex: 1; }
 
   .side { font-size: 15px; gap: 6px; }
   .side small { display: none; }
@@ -323,8 +323,15 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 #new-game { margin-left: auto; }
 .timer {
   display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px;
+  position: relative; overflow: hidden;
   background: var(--panel-2); border: 1px solid var(--line); font-variant-numeric: tabular-nums; transition: all .15s;
 }
+/* bara de progres: cât a mai rămas din meci */
+.timer::after { content: ''; position: absolute; left: 0; bottom: 0; height: 4px; width: var(--p, 100%); background: var(--accent); transition: width .25s linear; }
+.timer.last { border-color: var(--warn); }
+.timer.last::after { background: var(--warn); }
+.timer.last small { color: var(--warn); }
+.timer.done::after { background: var(--danger); }
 .timer b { font-size: 22px; min-width: 62px; text-align: left; }
 .timer .ico::before { content: '▶'; color: var(--accent); }
 .timer.on { border-color: var(--accent); }
@@ -333,10 +340,15 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 .timer.done .ico::before { content: '↺'; color: var(--danger); }
 .alarm .timer { animation: flash .5s steps(2) infinite; }
 @keyframes flash { 50% { background: var(--danger); color: #fff; } }
+/* GOL: câte un buton pe echipă, în culoarea ei */
+.goal-btns { display: flex; gap: 8px; }
 .goal-btn {
-  padding: 10px 22px; border-radius: 12px; font-size: 17px; font-weight: 900; letter-spacing: .5px;
-  background: linear-gradient(180deg, #ffd166, #f4a52a); color: #2a1a00; box-shadow: 0 6px 18px #f4b74033; transition: transform .1s, filter .15s;
+  display: flex; align-items: baseline; gap: 8px; padding: 10px 18px; border-radius: 12px; color: #fff; text-shadow: 0 2px 6px #0005;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--team) 80%, #fff), var(--team) 55%, color-mix(in srgb, var(--team) 75%, #000));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--team) 30%, transparent), inset 0 -4px 0 #0003; transition: transform .1s, filter .15s;
 }
+.goal-btn b { font-size: 17px; font-weight: 900; letter-spacing: 1px; }
+.goal-btn small { font-size: 12px; font-weight: 700; opacity: .9; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .goal-btn:hover { filter: brightness(1.08); }
 .goal-btn:active { transform: scale(.96); }
 
@@ -367,16 +379,16 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 .goal-row .gn { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 700px) {
   .goal-cols { grid-template-columns: 1fr; }
-  .timer { padding: 8px 12px; }
-  .goal-btn { padding: 10px 12px; }
+  .goal-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .goal-col h3 { display: none; }
 }
 
 /* live */
-.session-btn.live b::before { content: '● '; color: #2ec27e; }
+.session-btn.live b::before { content: '● '; color: var(--accent); }
 .session-btn.live.offline b::before { color: var(--muted); }
 .live-box { display: grid; gap: 8px; margin: 4px 0 8px; }
 .live-box p { margin: 0; font-size: 13px; line-height: 1.4; }
-.live-dot { color: #2ec27e; font-size: 12px; letter-spacing: .05em; }
+.live-dot { color: var(--accent); font-size: 12px; letter-spacing: .05em; }
 .live-dot.off { color: var(--muted); }
 .goal-btn:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.6); }
 .lock-left { color: var(--text, inherit); font-weight: 600; }
@@ -395,15 +407,30 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 .pause-opts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .pause-opts button { padding: 14px 0; font-size: 17px; font-weight: 800; }
 
-/* telefon: GOL și cronometrul mari, unul lângă altul */
+/* telefon: tabelă de scor, cronometrul și GOL-urile ocupă o treime din ecran */
 @media (max-width: 700px) {
+  .matchup, .matchbar { align-self: stretch; }
+  .matchup { padding: 14px 12px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); }
+  .side, .side.r { flex-direction: column; text-align: center; gap: 6px; font-size: 15px; }
+  .side i { width: 34px; height: 6px; }
+  .vs.score { font-size: 48px; font-weight: 900; background: none; padding: 0; letter-spacing: 2px; }
+
   .matchbar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
-  .timer { grid-area: 1 / 1; min-height: 68px; justify-content: center; padding: 8px; flex-wrap: wrap; gap: 4px 8px; }
-  .timer b { font-size: 32px; min-width: 0; }
-  .timer small { flex-basis: 100%; text-align: center; }
-  .goal-btn { grid-area: 1 / 2; min-height: 68px; font-size: 24px; padding: 8px; }
-  #timer-reset { grid-area: 2 / 1; padding: 10px; }
-  #new-game { grid-area: 2 / 2; margin: 0; padding: 10px; }
+  .timer { grid-area: 1 / 1 / 2 / 3; height: 150px; border-radius: 24px; border-width: 2px; flex-direction: column; justify-content: center; gap: 4px; }
+  .timer .ico { display: none; }
+  .timer b { font-size: 84px; font-weight: 800; line-height: 1; letter-spacing: -2px; min-width: 0; text-align: center; }
+  .timer small { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .timer::after { height: 6px; }
+  .timer.on { box-shadow: 0 0 0 4px #c6ff3d22; }
+  .timer.on small { color: var(--accent); }
+  .timer.last { box-shadow: 0 0 0 4px #ffb02022; }
+  .timer.last small { color: var(--warn); }
+  .goal-btns { grid-area: 2 / 1 / 3 / 3; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .goal-btn { height: 140px; border-radius: 24px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px; }
+  .goal-btn b { font-size: 44px; line-height: 1; letter-spacing: 2px; }
+  .goal-btn small { font-size: 15px; max-width: 100%; }
+  #timer-reset, #new-game { grid-row: 3; margin: 0; padding: 12px; border-radius: 14px; }
+  #timer-reset::after { content: ' Resetează'; }
   .pause-opts { grid-template-columns: 1fr 1fr; }
 }
 
@@ -429,6 +456,7 @@ menu button:not(.primary):not(.danger) { background: none; color: var(--muted); 
 /* intervalul sesiunii */
 .countdown { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 14px; border-radius: 12px;
   background: var(--panel-2); border: 1px solid var(--line); font-size: 15px; text-align: center; }
+.countdown[hidden] { display: none; }
 .countdown b { font-size: 20px; font-variant-numeric: tabular-nums; }
 .countdown small { color: var(--muted); font-size: 12px; }
 @media (max-width: 700px) { .countdown { order: 2; } }
