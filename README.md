@@ -44,6 +44,8 @@ python3 -m http.server 8080
 - `playing`: indicii celor 2 echipe de pe teren; a treia stă pe margine.
 - Fișierele salvate de aplicație au în plus `id` pe jucători și `custom` pe echipe (pozițiile mutate de mână).
 - `matchMin` (opțional, implicit 7): minutele unui meci, pentru cronometru.
+- `teamCount` (opțional, implicit 3): `2` = doar două echipe, fără margine și fără rotație; aceleași echipe joacă meci după meci.
+  Echipa 3 se ignoră.
 - `game` și `goals` (le scrie aplicația): numărul meciului curent și golurile, fiecare
   `{"player": "<id sau nume>", "team": 0, "vs": [0, 1], "game": 1, "at": <ms Unix>, "t": <ms din meci sau null>}`.
 

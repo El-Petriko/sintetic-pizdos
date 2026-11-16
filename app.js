@@ -55,8 +55,11 @@ function normalize(s) {
     t.custom ||= {};
     fit(t, s.size);
   }
+  s.teamCount ||= 3; // 2 = fără echipă pe margine: echipa 3 e ascunsă și goală, nu se face rotație
+  if (s.teamCount === 2) { s.playing = ['t1', 't2']; s.teams[2].slots.fill(null); s.teams[2].custom = {}; }
   return s;
 }
+const waiting = () => state.teamCount === 2 ? null : state.teams.find(t => !state.playing.includes(t.id));
 
 // Toate sesiunile de pe dispozitiv: { current: id, sessions: { id: sesiune } }
 const STORE = 'sintetic-v2';
@@ -162,7 +165,7 @@ function render() {
 
   // teren: playing[0] în stânga, playing[1] în dreapta, a treia echipă pe margine
   const [L, R] = state.playing.map(team);
-  const wait = state.teams.find(t => !state.playing.includes(t.id));
+  const wait = waiting();
   $('#halves').innerHTML = half(L, 'L') + half(R, 'R');
   const side = (t, cls) => `<span class="side ${cls}" style="--team:${t.color}"><i></i>${esc(t.name)}<small>${formationOf(t)}</small></span>`;
   const score = t => state.goals.filter(g => g.game === state.game && g.team === t.id).length;
@@ -171,7 +174,7 @@ function render() {
   $('#goal-btns').innerHTML = [L, R].map(t => `<button class="goal-btn" data-goal="${t.id}" style="--team:${t.color}"><b>GOL</b><small>${esc(t.name)}</small></button>`).join('');
   renderGoals();
   tick();
-  $('#bench').innerHTML = `<i style="background:${wait.color}"></i>Pe margine: <b>${esc(wait.name)}</b>
+  $('#bench').innerHTML = !wait ? '' : `<i style="background:${wait.color}"></i>Pe margine: <b>${esc(wait.name)}</b>
     ${[L, R].map(t => `<button class="ghost-btn sm" data-swap="${t.id}">intră în locul ${esc(t.name)}</button>`).join('')}`;
 
   const free = state.players
@@ -186,7 +189,7 @@ function render() {
     state.players.length ? 'Toți jucătorii sunt în echipe.' : 'Niciun jucător încă.<br>Apasă „+ Adaugă”.'
   }</div>`;
 
-  $('#teams').innerHTML = state.teams.map(t => {
+  $('#teams').innerHTML = state.teams.slice(0, state.teamCount).map(t => {
     const sp = spots(formationOf(t));
     const n = t.slots.filter(Boolean).length;
     const slots = t.slots.map((id, i) => id ? chip(player(id), i, sp[i].role) : `<div class="slot-empty" data-slot="${i}">Loc liber · ${ROLE[sp[i].role]}</div>`);
@@ -542,9 +545,9 @@ const setTimer = o => (state.timer = timer0({ at: now(), ...o }));
 // since[echipă] = meciul de la care e pe teren, ca la egal să iasă cea venită mai demult.
 // Pe margine nu e nimeni (meci cu 2 echipe): aceleași echipe joacă meciul următor; întoarce null.
 function swapIn(out, reason = 'manual') {
-  const wait = state.teams.find(t => !state.playing.includes(t.id));
+  const wait = waiting();
   closeMatch(reason, out);
-  if (!wait.slots.some(Boolean)) return newGame(), null;
+  if (!wait?.slots.some(Boolean)) return newGame(), null;
   state.playing[state.playing.indexOf(out)] = wait.id;
   state.since = { ...state.since, [wait.id]: state.game + 1 };
   newGame();
@@ -791,6 +794,7 @@ const cleanMeta = d => ({
   end: /^\d{2}:\d{2}$/.test(d.end) ? d.end : '',
   venue: str(d.venue, 40),
   matchMin: Number.isInteger(+d.matchMin) && +d.matchMin >= 1 && +d.matchMin <= 60 ? +d.matchMin : 7,
+  teamCount: +d.teamCount === 2 ? 2 : 3,
 });
 
 const idx = (s, tid) => s.teams.findIndex(t => t.id === tid);
@@ -801,7 +805,7 @@ function sessionToFile(s) {
     players: s.players.map(exportPlayer),
     teams: s.teams.map(t => ({ name: t.name, color: t.color, formation: t.formation || FORMATIONS[s.size][0], slots: t.slots, custom: t.custom })),
     playing: s.playing.map(id => s.teams.findIndex(t => t.id === id)),
-    matchMin: s.matchMin, game: s.game,
+    matchMin: s.matchMin, teamCount: s.teamCount, game: s.game,
     goals: s.goals.map(g => ({ player: g.player, team: idx(s, g.team), vs: g.vs.map(v => idx(s, v)), game: g.game, at: g.at, t: g.t })),
   };
 }
@@ -820,7 +824,7 @@ function sessionFromFile(d) {
     ref.set(p.name.toLowerCase(), p.id);
   }
   const used = new Set();
-  (Array.isArray(d.teams) ? d.teams : []).slice(0, 3).forEach((t, i) => {
+  (Array.isArray(d.teams) ? d.teams : []).slice(0, s.teamCount).forEach((t, i) => {
     const dst = s.teams[i];
     if (str(t?.name, 20)) dst.name = str(t.name, 20);
     if (/^#[0-9a-f]{6}$/i.test(t?.color)) dst.color = t.color;
@@ -949,7 +953,7 @@ nsDlg.addEventListener('close', async () => {
 
 function fillMenu() {
   const f = smDlg.querySelector('form');
-  for (const k of ['name', 'date', 'start', 'end', 'venue', 'matchMin']) f.elements[k].value = state[k] || '';
+  for (const k of ['name', 'date', 'start', 'end', 'venue', 'matchMin', 'teamCount']) f.elements[k].value = state[k] || '';
   const h = handles[state.id];
   $('#sm-file').textContent = h ? `Fișier: ${h.name}` : state.fileName ? `Fișier: ${state.fileName} (pe acest dispozitiv salvarea descarcă o copie nouă)` : 'Sesiunea nu a fost salvată încă într-un fișier.';
   const org = fb?.au.currentUser && !fb.au.currentUser.isAnonymous;
@@ -962,7 +966,7 @@ function fillMenu() {
     : `<button type="button" class="primary" data-act="live-on">📡 Pune online${org ? '' : ' (organizator)'}</button>
        <p class="hint">Primești un link: colegii văd live echipele și pot înregistra goluri și porni cronometrul.</p>`)
     + (org ? `<button type="button" class="ghost-btn sm" data-act="logout">Ieși din contul de organizator</button>` : '');
-  f.querySelectorAll('[name=name], [name=date], [name=start], [name=end], [name=venue], [name=matchMin]').forEach(i => (i.disabled = viewer()));
+  f.querySelectorAll('[name=name], [name=date], [name=start], [name=end], [name=venue], [name=matchMin], [name=teamCount]').forEach(i => (i.disabled = viewer()));
   $('#sm-save').textContent = h ? `Salvează în ${h.name}` : 'Salvează în fișier';
   $('#sm-list').innerHTML = Object.values(store.sessions).sort((a, b) => (b.updated || 0) - (a.updated || 0)).map(s => `
     <div class="sess${s.id === state.id ? ' on' : ''}">
@@ -976,8 +980,9 @@ const openMenu = () => { fillMenu(); smDlg.showModal(); };
 $('#session').addEventListener('click', openMenu);
 smDlg.addEventListener('change', e => { // detaliile se salvează pe loc
   const k = e.target.name;
-  if (!['name', 'date', 'start', 'end', 'venue', 'matchMin'].includes(k)) return;
+  if (!['name', 'date', 'start', 'end', 'venue', 'matchMin', 'teamCount'].includes(k)) return;
   Object.assign(state, { [k]: cleanMeta({ ...state, [k]: e.target.value })[k] });
+  if (k === 'teamCount') normalize(state);
   save(); render();
 });
 smDlg.addEventListener('click', async e => {
