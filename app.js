@@ -540,9 +540,11 @@ const setTimer = o => (state.timer = timer0({ at: now(), ...o }));
 
 // Echipa `out` iese, intră cea de pe margine, începe meciul următor (cronometrul așteaptă pornirea).
 // since[echipă] = meciul de la care e pe teren, ca la egal să iasă cea venită mai demult.
+// Pe margine nu e nimeni (meci cu 2 echipe): aceleași echipe joacă meciul următor; întoarce null.
 function swapIn(out, reason = 'manual') {
   const wait = state.teams.find(t => !state.playing.includes(t.id));
   closeMatch(reason, out);
+  if (!wait.slots.some(Boolean)) return newGame(), null;
   state.playing[state.playing.indexOf(out)] = wait.id;
   state.since = { ...state.since, [wait.id]: state.game + 1 };
   newGame();
@@ -566,6 +568,7 @@ function endByTime() {
   const out = ga !== gb ? (ga < gb ? a : b) : (since[b] ?? 1) < (since[a] ?? 1) ? b : a;
   const win = out === a ? b : a, wn = team(win).name, on = team(out).name;
   const wait = swapIn(out, 'timp');
+  if (!wait) return ga !== gb ? `⏱ Timp! ${wn} câștigă ${Math.max(ga, gb)}–${Math.min(ga, gb)}. Meci nou.` : `⏱ Timp! Egal ${ga}–${gb}. Meci nou.`;
   return ga !== gb ? `⏱ Timp! ${wn} câștigă ${Math.max(ga, gb)}–${Math.min(ga, gb)}. Intră ${wait.name} în locul ${on}.`
     : `⏱ Timp! Egal ${ga}–${gb}: iese ${on} (pe teren de mai mult timp), intră ${wait.name}.`;
 }
@@ -742,7 +745,7 @@ goalDlg.addEventListener('click', e => {
     const loser = team(state.playing.find(id => id !== t.id));
     if (!state.playing.includes(t.id) || goalsOf(t.id) < WIN) return toast(`⚽ Gol! ${p.name} (${t.name})`), navigator.vibrate?.(60);
     const score = `${goalsOf(t.id)}–${goalsOf(loser.id)}`, wait = swapIn(loser.id, '2 goluri');
-    toast(`🏆 ${t.name} câștigă ${score}! Intră ${wait.name} în locul ${loser.name}. Porniți cronometrul când sunteți gata.`);
+    toast(`🏆 ${t.name} câștigă ${score}! ${wait ? `Intră ${wait.name} în locul ${loser.name}.` : 'Meci nou.'} Porniți cronometrul când sunteți gata.`);
     navigator.vibrate?.([80, 60, 80, 60, 200]);
     keepAwake(false);
   });
