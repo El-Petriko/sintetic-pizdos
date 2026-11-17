@@ -41,6 +41,12 @@
         ".read": "auth != null && auth.uid === 'rYXL1ZGGjdhs39mDCvVXd1IIzKs1'",
         ".write": "auth != null && auth.uid === 'rYXL1ZGGjdhs39mDCvVXd1IIzKs1'"
       }
+    },
+    "meciuri": {
+      ".read": "auth != null",
+      "$sid": {
+        ".write": "auth != null && auth.uid === 'rYXL1ZGGjdhs39mDCvVXd1IIzKs1' && $sid.length >= 20"
+      }
     }
   }
 }

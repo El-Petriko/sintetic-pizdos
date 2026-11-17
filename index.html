@@ -8,8 +8,38 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- ecranul de start: lista meciurilor de pe server și ajutorul -->
+  <section class="home" id="home" hidden>
+    <div class="home-head">
+      <div class="brand"><span class="ball">⚽</span> sintetic-pizdos</div>
+      <div class="seg home-tabs" role="tablist">
+        <button data-tab="matches" class="on">Meciuri</button>
+        <button data-tab="help">Help</button>
+      </div>
+    </div>
+    <div class="home-tab" id="tab-matches">
+      <div class="match-list" id="match-list"><p class="hint">Se încarcă meciurile…</p></div>
+      <button class="ghost-btn" id="my-sessions">Sesiunile mele (organizator)</button>
+    </div>
+    <div class="home-tab help" id="tab-help" hidden>
+      <h3>Meciuri</h3>
+      <p>Lista arată toate meciurile puse online de organizator. <b>Acum</b> = meciul se joacă, <b>Programat</b> = urmează,
+        cele <b>încheiate</b> apar estompate, la final. Atinge un meci ca să-l deschizi.</p>
+      <h3>Terenul și echipele</h3>
+      <p>Vezi echipele de pe teren față în față și echipa de pe margine. Organizatorul mută jucătorii (drag & drop sau atingi jucătorul, apoi locul).</p>
+      <h3>Cronometru</h3>
+      <p>Pornește / oprește meciul (implicit 7 minute). La final sună alarma, iar echipele se rotesc singure.</p>
+      <h3>Goluri</h3>
+      <p>Apasă <b>GOL</b> la echipa care a marcat și alege jucătorul. Doar un telefon înregistrează un gol odată.
+        Prima echipă la 2 goluri câștigă, învinsa iese, intră echipa de pe margine.</p>
+      <h3>Cine ce poate</h3>
+      <p>Organizatorul editează tot. Ceilalți pot doar goluri și cronometru, și doar în intervalul meciului.</p>
+      <h3>Înapoi</h3>
+      <p>Din meci, atinge ⚽ din stânga sus ca să revii la listă.</p>
+    </div>
+  </section>
   <header class="top">
-    <div class="brand"><span class="ball">⚽</span><span class="brand-name"> sintetic-pizdos</span></div>
+    <button class="brand" id="go-home" title="Înapoi la meciuri"><span class="ball">⚽</span><span class="brand-name"> sintetic-pizdos</span></button>
     <button class="session-btn" id="session" title="Sesiunea: detalii, salvare, sesiune nouă"><b id="s-name"></b><small id="s-meta"></small></button>
     <button class="ghost-btn org-btn" id="org-btn" title="Panou organizator: istoric, cronometru, ce pot face ceilalți">🛡</button>
     <div class="seg" id="size" role="radiogroup" aria-label="Jucători pe echipă">

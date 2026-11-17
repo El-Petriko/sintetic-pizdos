@@ -944,17 +944,15 @@ function openNew(mode) {
   $('#ns-hint').textContent = mode === 'start' ? 'Nu ai nicio sesiune pe acest dispozitiv. Creează una sau importă un fișier.'
     : mode === 'replace' ? `„${state.name}” va fi ștearsă de pe dispozitiv.` : '';
   $('#ns-keep').hidden = mode === 'start';
-  $('#ns-cancel').hidden = mode === 'start';
   nsDlg.showModal();
 }
 
-nsDlg.addEventListener('cancel', e => { if (nsMode === 'start') e.preventDefault(); }); // fără sesiune nu ai ce afișa
 nsDlg.addEventListener('close', async () => {
   const act = nsDlg.returnValue, f = nsDlg.querySelector('form');
   nsDlg.returnValue = '';
   const replace = nsMode === 'replace';
   if (act === 'import') { if (!(await importSession(replace)) && nsMode === 'start') nsDlg.showModal(); return; }
-  if (act !== 'ok') return;
+  if (act !== 'ok') { if (!state) showHome(); return; } // fără sesiune nu ai ce afișa: înapoi la meciuri
   const s = blankSession(cleanMeta(Object.fromEntries(new FormData(f))), +f.elements.size.value);
   if (state && nsMode !== 'start' && f.elements.keep.checked) s.players = structuredClone(state.players);
   useSession(s, replace);
@@ -1035,6 +1033,7 @@ smDlg.addEventListener('click', async e => {
     const sid = state.live;
     // întâi ne dezabonăm, ca ștergerea să nu apară aici ca „încheiată de organizator”
     Object.assign(state, { live: null, mine: false }); persist(); goLive(); render();
+    fb.remove(fb.ref(fb.db, `meciuri/${sid}`)).catch(() => {});
     try { await fb.remove(fb.ref(fb.db, `live/${sid}`)); toast('Sesiunea live s-a încheiat. Acum e locală.'); }
     catch { toast('Nu am putut șterge sesiunea de pe server.'); }
     return fillMenu();
@@ -1192,9 +1191,13 @@ function push() {
   if (state.mine) {
     const w = json(windowOf(state));
     if (w !== lastWindow) { lastWindow = w; fb.set(fb.ref(fb.db, `live/${state.live}/window`), windowOf(state)).catch(() => {}); }
+    // lista publică de pe ecranul de start: doar detaliile meciului
+    const m = { name: state.name, date: state.date, start: state.start || '', end: state.end || '', venue: state.venue || '' };
+    const key = state.live + json(m);
+    if (key !== lastIndex) { lastIndex = key; fb.set(fb.ref(fb.db, `meciuri/${state.live}`), m).catch(() => {}); }
   }
 }
-let lastWindow = null;
+let lastWindow = null, lastIndex = null;
 
 // Arhiva: telefonul organizatorului ține pe server o copie a sesiunii (fără poze) sub arhiva/<id sesiune>,
 // doar contul lui o citește și o scrie. Rămâne după încheierea live-ului și după „Link nou”.
@@ -1233,7 +1236,7 @@ function pull(sid, val) {
   }
   if (!first) record('alt telefon');
   persist();
-  if (first) toast(`Conectat la „${state.name}”.`);
+  if (first) { toast(`Conectat la „${state.name}”.`); if (state.mine) push(); } // push: meciul apare și în lista publică
   // cât tragi un jucător sau scrii într-un câmp, randarea așteaptă (altfel ți-ar fugi elementul de sub deget)
   if (drag || document.activeElement?.matches('input')) stale = true; else render();
 }
@@ -1403,6 +1406,7 @@ async function newLink() {
   if (!(await connect(sid, true))) { state.live = old; persist(); goLive(); return; }
   fb.set(fb.ref(fb.db, `live/${sid}/perm`), keep).catch(() => {});
   fb.remove(fb.ref(fb.db, `live/${old}`)).catch(() => {});
+  fb.remove(fb.ref(fb.db, `meciuri/${old}`)).catch(() => {});
   fillOrg();
   shareLink();
 }
@@ -1424,9 +1428,55 @@ orgDlg.addEventListener('change', e => {
 // Linkul #live=<sid>: deschide sesiunea (sau o creează pe dispozitiv), apoi o umple de pe server.
 addEventListener('hashchange', () => { if (location.hash.includes('live=')) location.reload(); }); // linkul deschis peste aplicație
 const joinId = location.hash.match(/live=([a-z0-9]{20,})/)?.[1];
+function join(sid, name = 'Sesiune live') {
+  let s = Object.values(store.sessions).find(x => x.live === sid);
+  if (!s) { s = blankSession({ name }); s.live = sid; }
+  useSession(s);
+}
+
+/* ---------- ecranul de start: Meciuri / Help ---------- */
+// Lista vine din meciuri/<sid> (o scrie telefonul organizatorului, o citește oricine). Acum / Programat / Încheiat după interval.
+let homeSub = null, homeVal = null;
+function matchStatus(m) {
+  const w = windowOf(m), t = now();
+  if (w) return t < w.from ? 'next' : t > w.to ? 'past' : 'now';
+  return m.date < today() ? 'past' : m.date > today() ? 'next' : 'now';
+}
+function renderHome(val) {
+  homeVal = val;
+  const order = { now: 0, next: 1, past: 2 };
+  const list = Object.entries(val || {}).filter(([sid]) => /^[a-z0-9]{20,}$/.test(sid))
+    .map(([sid, m]) => ({ sid, ...cleanMeta(m || {}) })).map(m => ({ ...m, st: matchStatus(m) }))
+    .sort((a, b) => order[a.st] - order[b.st] || (a.date + a.start).localeCompare(b.date + b.start) * (a.st === 'past' ? -1 : 1));
+  const label = { now: 'Acum', next: 'Programat', past: 'Încheiat' };
+  $('#match-list').innerHTML = list.length ? list.map(m => `
+    <button class="match-card ${m.st}" data-sid="${m.sid}" data-name="${esc(m.name)}">
+      <span class="badge">${label[m.st]}</span>
+      <b>${esc(m.name)}</b>
+      <small>${esc([fmtDate(m.date), m.start && m.start + (m.end ? '–' + m.end : ''), m.venue].filter(Boolean).join(' · '))}</small>
+    </button>`).join('') : '<p class="hint">Niciun meci online deocamdată.</p>';
+}
+async function showHome() {
+  document.body.classList.add('at-home');
+  $('#home').hidden = false;
+  if (homeSub || !(await loadFb())) { if (!fb) $('#match-list').innerHTML = '<p class="hint">Nu m-am putut conecta la server.</p>'; return; }
+  homeSub = fb.onValue(fb.ref(fb.db, 'meciuri'), s => renderHome(s.val()), () => renderHome(null));
+}
+function leaveHome() { document.body.classList.remove('at-home'); $('#home').hidden = true; }
+$('#home').addEventListener('click', e => {
+  const tab = e.target.closest('[data-tab]')?.dataset.tab;
+  if (tab) {
+    $('#home').querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+    $('#tab-matches').hidden = tab !== 'matches'; $('#tab-help').hidden = tab !== 'help';
+  }
+  const card = e.target.closest('.match-card');
+  if (card) { leaveHome(); join(card.dataset.sid, card.dataset.name); }
+});
+$('#my-sessions').addEventListener('click', () => { leaveHome(); if (state) { render(); goLive(); } else openNew('start'); });
+$('#go-home').addEventListener('click', showHome);
+setInterval(() => { if (!$('#home').hidden && homeSub) renderHome(homeVal); }, 60000); // Acum → Încheiat fără reload
+
 if (joinId) {
   history.replaceState(null, '', location.pathname);
-  let s = Object.values(store.sessions).find(x => x.live === joinId);
-  if (!s) { s = blankSession({ name: 'Sesiune live' }); s.live = joinId; }
-  useSession(s);
-} else if (state) { render(); goLive(); } else openNew('start');
+  join(joinId);
+} else showHome();
