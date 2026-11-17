@@ -156,6 +156,7 @@ main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .dragging { opacity: .25; }
 .chip.target, .slot-empty.target { border-color: var(--accent); transform: scale(1.02); }
 .chip .name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip.keeper { cursor: default; } .chip.keeper small { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .team .chip .av { box-shadow: 0 0 0 2px var(--team); }
 
 .ghost {

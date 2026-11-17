@@ -46,6 +46,8 @@ python3 -m http.server 8080
 - `matchMin` (opțional, implicit 7): minutele unui meci, pentru cronometru.
 - `teamCount` (opțional, implicit 3): `2` = doar două echipe, fără margine și fără rotație; aceleași echipe joacă meci după meci.
   Echipa 3 se ignoră.
+- `keepers` (opțional): `["portar stânga", "portar dreapta"]`, prin nume sau `id`. Portarii rămân pe teren: când o echipă iese,
+  cea care intră îi ia portarul. Nu stau în nicio echipă (locul 0 al echipelor rămâne gol). Pentru 2 portari la 3 echipe.
 - `game` și `goals` (le scrie aplicația): numărul meciului curent și golurile, fiecare
   `{"player": "<id sau nume>", "team": 0, "vs": [0, 1], "game": 1, "at": <ms Unix>, "t": <ms din meci sau null>}`.
 

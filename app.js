@@ -57,6 +57,8 @@ function normalize(s) {
   }
   s.teamCount ||= 3; // 2 = fără echipă pe margine: echipa 3 e ascunsă și goală, nu se face rotație
   if (s.teamCount === 2) { s.playing = ['t1', 't2']; s.teams[2].slots.fill(null); s.teams[2].custom = {}; }
+  s.keepers ||= null; // portarii nu stau în echipe: locul 0 rămâne gol
+  if (s.keepers) for (const t of s.teams) t.slots = t.slots.map((x, i) => i === 0 || s.keepers.includes(x) ? null : x);
   return s;
 }
 const waiting = () => state.teamCount === 2 ? null : state.teams.find(t => !state.playing.includes(t.id));
@@ -95,6 +97,9 @@ const save = () => { if (forbidden()) return revert(); record('tu'); persist(); 
 const player = id => state.players.find(p => p.id === id);
 const team = id => state.teams.find(t => t.id === id);
 const teamOf = id => state.teams.find(t => t.slots.includes(id));
+// Portari pe teren: keepers[i] apără poarta lui playing[i] și rămâne acolo când echipa lui iese (o ia echipa care intră).
+const keeperOf = t => { const i = state.keepers ? state.playing.indexOf(t.id) : -1; return i >= 0 && player(state.keepers[i]) ? state.keepers[i] : null; };
+const slotsOf = t => { const k = keeperOf(t); return k ? [k, ...t.slots.slice(1)] : t.slots; };
 const formationOf = t => FORMATIONS[state.size].includes(t.formation) ? t.formation : FORMATIONS[state.size][0];
 
 // "2-1-1" → portarul + liniile, de la apărare la atac
@@ -137,12 +142,12 @@ function chip(p, slot = '', role = '') {
 
 function half(t, side) {
   const sp = spots(formationOf(t));
-  const tokens = t.slots.map((id, i) => {
+  const tokens = slotsOf(t).map((id, i) => {
     const { x, y } = t.custom[i] || sp[i];
     const at = `--x:${x};--y:${y}`;
-    const p = id && player(id);
+    const p = id && player(id), kp = i === 0 && keeperOf(t);
     return p
-      ? `<div class="token" data-id="${p.id}" data-slot="${i}" title="${esc(p.name)} · ${ROLE[p.pos]}" style="${at};view-transition-name:k-${p.id}">
+      ? `<div class="token${kp ? ' keeper' : ''}" ${kp ? '' : `data-id="${p.id}" data-slot="${i}"`} title="${esc(p.name)} · ${ROLE[p.pos]}" style="${at};view-transition-name:k-${p.id}">
           <div class="disc">${avatar(p)}${badge(p)}</div><span class="tname">${esc(short(p))}</span></div>`
       : `<div class="token empty" data-slot="${i}" style="${at}">
           <div class="disc"></div><span class="tname">${ROLE[sp[i].role]}</span></div>`;
@@ -178,7 +183,7 @@ function render() {
     ${[L, R].map(t => `<button class="ghost-btn sm" data-swap="${t.id}">intră în locul ${esc(t.name)}</button>`).join('')}`;
 
   const free = state.players
-    .filter(p => !teamOf(p.id))
+    .filter(p => !teamOf(p.id) && !state.keepers?.includes(p.id))
     .sort((a, b) => POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || a.name.localeCompare(b.name, 'ro'));
   $('#pool-count').textContent = state.players.length ? `${free.length} / ${state.players.length}` : '';
   const GROUP = { P: 'Portari', F: 'Fundași', M: 'Mijlocași', A: 'Atacanți' };
@@ -191,8 +196,10 @@ function render() {
 
   $('#teams').innerHTML = state.teams.slice(0, state.teamCount).map(t => {
     const sp = spots(formationOf(t));
-    const n = t.slots.filter(Boolean).length;
-    const slots = t.slots.map((id, i) => id ? chip(player(id), i, sp[i].role) : `<div class="slot-empty" data-slot="${i}">Loc liber · ${ROLE[sp[i].role]}</div>`);
+    const ss = slotsOf(t), n = ss.filter(Boolean).length, kp = keeperOf(t);
+    const slots = ss.map((id, i) => i === 0 && kp ? `<div class="chip keeper"><span class="role">P</span>${avatar(player(id))}<span class="name">${esc(player(id).name)}</span><small>rămâne pe teren</small></div>`
+      : i === 0 && state.keepers ? `<div class="slot-empty">Portar · îl ia de la echipa care iese</div>`
+      : id ? chip(player(id), i, sp[i].role) : `<div class="slot-empty" data-slot="${i}">Loc liber · ${ROLE[sp[i].role]}</div>`);
     return `<section class="panel team${n === state.size ? ' full' : ''}${t === wait ? ' waiting' : ''}" data-zone="${t.id}" style="--team:${t.color}">
       <div class="panel-head">
         <input type="color" class="swatch" value="${t.color}" data-team="${t.id}" aria-label="Culoarea echipei">
@@ -560,7 +567,7 @@ function closeMatch(reason, out = null) {
   if (!score[0] && !score[1] && !elapsed()) return;
   state.matches.push({
     id: `m${state.game}`, game: state.game, teams: [a, b], score, out, reason, end: now(), played: Math.round(elapsed()),
-    winner: score[0] === score[1] ? null : score[0] > score[1] ? a : b, lineups: [a, b].map(id => team(id).slots.filter(Boolean)),
+    winner: score[0] === score[1] ? null : score[0] > score[1] ? a : b, lineups: [a, b].map(id => slotsOf(team(id)).filter(Boolean)),
   });
 }
 const goalsOf = id => state.goals.filter(g => g.game === state.game && g.team === id).length;
@@ -722,7 +729,7 @@ $('#goal-btns').addEventListener('click', async e => {
   if (!(await takeLock())) return toast('Altcineva înregistrează deja un gol.');
   $('#goal-left').textContent = '';
   const cols = [team(scorer.dataset.goal)].map(t => {
-    const ps = t.slots.filter(Boolean).map(player);
+    const ps = slotsOf(t).filter(Boolean).map(player);
     return `<div class="goal-col" style="--team:${t.color}"><h3><i></i>${esc(t.name)}</h3>${ps.length
       ? ps.map(p => `<button type="button" class="scorer" data-scorer="${p.id}" data-team="${t.id}">${avatar(p)}<span>${esc(p.name)}</span></button>`).join('')
       : '<p class="hint">Niciun jucător în echipă.</p>'}</div>`;
@@ -805,7 +812,7 @@ function sessionToFile(s) {
     players: s.players.map(exportPlayer),
     teams: s.teams.map(t => ({ name: t.name, color: t.color, formation: t.formation || FORMATIONS[s.size][0], slots: t.slots, custom: t.custom })),
     playing: s.playing.map(id => s.teams.findIndex(t => t.id === id)),
-    matchMin: s.matchMin, teamCount: s.teamCount, game: s.game,
+    matchMin: s.matchMin, teamCount: s.teamCount, keepers: s.keepers || undefined, game: s.game,
     goals: s.goals.map(g => ({ player: g.player, team: idx(s, g.team), vs: g.vs.map(v => idx(s, v)), game: g.game, at: g.at, t: g.t })),
   };
 }
@@ -824,6 +831,8 @@ function sessionFromFile(d) {
     ref.set(p.name.toLowerCase(), p.id);
   }
   const used = new Set();
+  const kp = Array.isArray(d.keepers) ? d.keepers.map(r => typeof r === 'string' && (ref.get(r) || ref.get(r.trim().toLowerCase()))) : [];
+  if (kp.length === 2 && kp[0] && kp[1] && kp[0] !== kp[1]) { s.keepers = kp; kp.forEach(id => used.add(id)); }
   (Array.isArray(d.teams) ? d.teams : []).slice(0, s.teamCount).forEach((t, i) => {
     const dst = s.teams[i];
     if (str(t?.name, 20)) dst.name = str(t.name, 20);
@@ -1165,6 +1174,7 @@ function fromLive(f) {
   const tm = raw.timer || {};
   return {
     ...cleanMeta(raw), size, players, teams, playing, goals, matches,
+    keepers: Array.isArray(raw.keepers) && raw.keepers.length === 2 && raw.keepers.every(id => has.has(id)) && raw.keepers[0] !== raw.keepers[1] ? raw.keepers : null,
     game: Number.isInteger(raw.game) && raw.game >= 1 ? raw.game : 1,
     since: Object.fromEntries(Object.entries(raw.since && typeof raw.since === 'object' ? raw.since : {}).filter(([k, v]) => tid.has(k) && Number.isInteger(v) && v >= 1)),
     timer: timer0({ startedAt: num(tm.startedAt), acc: Math.max(0, num(tm.acc) || 0), pauseUntil: num(tm.pauseUntil), at: num(tm.at) }),
