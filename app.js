@@ -1472,16 +1472,12 @@ async function showHome() {
 }
 function leaveHome() { document.body.classList.remove('at-home'); $('#home').hidden = true; }
 $('#home').addEventListener('click', e => {
-  const tab = e.target.closest('[data-tab]')?.dataset.tab;
-  if (tab) {
-    $('#home').querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-    $('#tab-matches').hidden = tab !== 'matches'; $('#tab-help').hidden = tab !== 'help';
-  }
   const card = e.target.closest('.match-card');
   if (card) { leaveHome(); join(card.dataset.sid, card.dataset.name); }
 });
 $('#my-sessions').addEventListener('click', () => { leaveHome(); if (state) { render(); goLive(); } else openNew('start'); });
 $('#go-home').addEventListener('click', showHome);
+document.addEventListener('click', e => { if (e.target.closest('[data-help]')) $('#help').showModal(); });
 setInterval(() => { if (!$('#home').hidden && homeSub) renderHome(homeVal); }, 60000); // Acum → Încheiat fără reload
 
 if (joinId) {
