@@ -127,6 +127,8 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   IBM Plex Sans/Mono servite din `fonts/` (latin + latin-ext), accent cobalt `#6f8dff`, colțuri 5/8/12 px, fără strălucire/gradient,
   greutăți max 700. Numele variabilelor vechi (`--panel`, `--text`, `--muted`) rămân; culorile implicite ale echipelor nu s-au schimbat.
 
+- Meniul sesiunii (2026-11-17): 4 file (`smTab()`): Detalii (+ Golește echipele) · Live · Fișier · Salvate; ține ultima filă deschisă.
+
 ## Pași rămași
 - Feedback utilizator pe v1 desktop.
 - PWA (manifest, offline), dacă e nevoie.
