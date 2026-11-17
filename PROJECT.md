@@ -30,6 +30,15 @@ Pozele se micșorează la ~128px în browser înainte de salvare.
 - Online: https://el-petriko.github.io/sintetic-pizdos/ (GitHub Pages din `main`, se actualizează la fiecare push)
 - Repo: https://github.com/El-Petriko/sintetic-pizdos (public; redenumit din `sintetic` pe 2026-11-12, linkul vechi de Pages nu mai merge). Push-ul folosește un helper local cu tokenul contului El-Petriko.
 
+## Verificare: text întâi, screenshot la final
+Sesiunile din 12.11 au costat 25 USD, mai ales din screenshot-uri recitite la fiecare tură. De acum:
+- **Starea:** `javascript_tool` cu `JSON.stringify(state)` sau doar bucata de interes (`state.teams`, `state.timer`, `state.goals`);
+  `state` și `store` sunt globale (`app.js` e script clasic).
+- **Ce se vede / unde:** `read_page` (texte, butoane, refs pentru click), `get_page_text`, iar pentru așezare
+  `getBoundingClientRect()` și `getComputedStyle()` pe elementele vizate (ex. jetoanele de pe teren: `x/y/width`, culori).
+- **Screenshot:** doar pentru judecata vizuală (arată bine?), unul la finalul unei runde, la scară mică. Hook-ul `nudge.py` blochează
+  al 4-lea pe sesiune. Pentru o rundă de design cu El-Petriko: `touch sessions/.allow_images` (valabil 3 ore), cu acordul lui.
+
 ## Plan
 Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, pe aceleași 3 fișiere.
 
@@ -107,6 +116,11 @@ Lucrez direct, fără workeri: e muncă de design, iterativă cu utilizatorul, p
   (`goals`, `timer`, aplicate și în reguli); „Link nou” mută sesiunea pe alt `sid` și o șterge pe cea veche.
   Spectatorii doar adaugă goluri (nu șterg), iar cooldown-ul de 5 s e doar pentru ei.
 - Test live: două origini (`localhost:8080` și `:8081`, configurația `sintetic-pizdos-2` din `.claude/launch.json`) = două „telefoane”.
+- Ecran de start (2026-11-17): la deschidere, rubricile „Meciuri” și „Help” (`#home`, clasa `at-home` pe body ascunde aplicația).
+  Lista vine din `meciuri/<sid> = {name, date, start, end, venue}`, scrisă de telefonul organizatorului în `push()` și citită de oricine
+  (regulă nouă în `database.rules.json`); statusul Acum / Programat / Încheiat din `windowOf()` (fără oră: după dată), încheiatele estompate, la final.
+  Atingi un meci → `join(sid)`, ca linkul `#live=`. ⚽ din antet = înapoi la listă; „Sesiunile mele (organizator)” = sesiunile locale.
+  „Încheie live” și „Link nou” scot meciul (vechi) din listă.
 - Model: `team.slots[i]` = loc fix (0 = portar), `team.custom[i]` = poziție mutată de mână. Datele vechi (`members`) se migrează la încărcare.
 
 ## Pași rămași
