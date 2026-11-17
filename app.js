@@ -990,6 +990,10 @@ function fillMenu() {
       <button type="button" class="ghost-btn sm danger-x" data-del="${s.id}" aria-label="Șterge sesiunea">✕</button>
     </div>`).join('');
 }
+const smTab = t => {
+  smDlg.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  smDlg.querySelectorAll('[data-pane]').forEach(p => (p.hidden = p.dataset.pane !== t));
+};
 const openMenu = () => { fillMenu(); smDlg.showModal(); };
 
 $('#session').addEventListener('click', openMenu);
@@ -1003,6 +1007,7 @@ smDlg.addEventListener('change', e => { // detaliile se salvează pe loc
 smDlg.addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b) return;
+  if (b.dataset.tab) return smTab(b.dataset.tab);
   if (b.dataset.open) { smDlg.close(); return useSession(store.sessions[b.dataset.open]); }
   if (b.dataset.del) {
     const s = store.sessions[b.dataset.del];

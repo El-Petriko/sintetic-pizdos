@@ -225,6 +225,10 @@ dialog h3 { margin: 6px 0 -4px; font-size: 13px; text-transform: uppercase; lett
 .sess em { color: var(--accent); font-size: 12px; font-style: normal; font-weight: 700; }
 .danger-x:hover { color: var(--danger); border-color: var(--danger); }
 #new-session, #session-menu { width: 440px; max-height: calc(100dvh - 32px); }
+.tabs { display: flex; }
+.tabs button { flex: 1; }
+.tab-pane { display: flex; flex-direction: column; gap: 14px; min-height: 250px; }
+.tab-pane[hidden] { display: none; }
 .pos-pick { justify-content: space-between; }
 .pos-pick span { padding: 6px 10px; }
 menu { display: flex; gap: 8px; margin: 4px 0 0; padding: 0; }

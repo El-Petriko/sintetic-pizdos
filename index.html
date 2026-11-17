@@ -116,6 +116,13 @@
   <dialog id="session-menu">
     <form method="dialog">
       <h2>Sesiunea</h2>
+      <div class="seg tabs" id="sm-tabs" role="tablist">
+        <button type="button" data-tab="details" class="on">Detalii</button>
+        <button type="button" data-tab="live">Live</button>
+        <button type="button" data-tab="file">Fișier</button>
+        <button type="button" data-tab="saved">Salvate</button>
+      </div>
+      <div class="tab-pane" data-pane="details">
       <label class="lbl">Nume<input class="field" name="name" maxlength="40"></label>
       <div class="row">
         <label class="lbl">Data<input class="field" type="date" name="date"></label>
@@ -127,7 +134,10 @@
         <label class="lbl">Minute pe meci<input class="field" type="number" name="matchMin" min="1" max="60" inputmode="numeric"></label>
         <label class="lbl">Echipe<select class="field" name="teamCount"><option value="3">3 (cu rotație)</option><option value="2">2 (fără margine)</option></select></label>
       </div>
-      <div class="live-box" id="sm-live"></div>
+      <div class="actions"><button type="button" class="ghost-btn" data-act="clear">Golește echipele</button></div>
+      </div>
+      <div class="tab-pane live-box" data-pane="live" id="sm-live" hidden></div>
+      <div class="tab-pane" data-pane="file" hidden>
       <p class="hint" id="sm-file"></p>
       <div class="actions">
         <button type="button" class="primary" data-act="save" id="sm-save">Salvează în fișier</button>
@@ -135,10 +145,12 @@
         <button type="button" class="ghost-btn" data-act="import">Importă sesiune</button>
         <button type="button" class="ghost-btn" data-act="new">Sesiune nouă</button>
         <button type="button" class="ghost-btn" data-act="replace">Înlocuiește cu una nouă</button>
-        <button type="button" class="ghost-btn" data-act="clear">Golește echipele</button>
       </div>
+      </div>
+      <div class="tab-pane" data-pane="saved" hidden>
       <h3>Salvate pe acest dispozitiv</h3>
       <div class="sessions" id="sm-list"></div>
+      </div>
       <menu><span class="spacer"></span><button value="close">Închide</button></menu>
     </form>
   </dialog>
