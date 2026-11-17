@@ -88,7 +88,7 @@ function persist() {
   state.updated = Date.now();
   store.sessions[state.id] = state;
   store.current = state.id;
-  try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { alert('Nu am putut salva: spațiul din browser e plin.'); }
+  try { localStorage.setItem(STORE, JSON.stringify(store)); } catch { toast('Nu am putut salva: spațiul din browser e plin.'); }
   archive();
 }
 // push: trimite schimbarea în sesiunea live, dacă e cazul. Spectatorul poate schimba doar golurile și cronometrul.
@@ -417,6 +417,14 @@ $('#teams').addEventListener('input', e => { // culoarea se vede live cât tragi
 // La import se acceptă și o listă simplă; "pos" poate fi P/F/M/A sau cuvântul întreg („Fundaș”); "photo" e opțional.
 const FORMAT = 'sintetic-jucatori';
 
+// Confirmare cu dialogul aplicației, nu confirm(): pe Firefox, „nu mai lăsa site-ul să deschidă dialoguri” face confirm() să răspundă mereu Nu.
+const askDlg = $('#ask');
+function ask(msg) {
+  $('#ask-msg').textContent = msg;
+  askDlg.returnValue = '';
+  askDlg.showModal();
+  return new Promise(r => askDlg.addEventListener('close', () => r(askDlg.returnValue === 'ok'), { once: true }));
+}
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg;
@@ -506,7 +514,7 @@ $('#photo').addEventListener('change', async e => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  try { photo = await shrink(f); preview(); } catch { alert('Nu am putut citi imaginea.'); }
+  try { photo = await shrink(f); preview(); } catch { toast('Nu am putut citi imaginea.'); }
 });
 
 // Decupează pătrat din centru și micșorează la 128px, ca să încapă multe poze în localStorage.
@@ -518,7 +526,7 @@ async function shrink(file) {
   return c.toDataURL('image/jpeg', 0.85);
 }
 
-dlg.addEventListener('close', () => {
+dlg.addEventListener('close', async () => {
   const action = dlg.returnValue;
   dlg.returnValue = '';
   const name = $('#name').value.trim();
@@ -530,7 +538,7 @@ dlg.addEventListener('close', () => {
     else state.players.push({ id: uid(), name, pos, photo, role });
   });
   const id = editing?.id;
-  if (action === 'delete' && id && confirm(`Ștergi pe ${editing.name}?`)) commit(() => {
+  if (action === 'delete' && id && await ask(`Ștergi pe ${editing.name}?`)) commit(() => {
     move(id, null);
     state.players = state.players.filter(p => p.id !== id);
   });
@@ -708,15 +716,15 @@ pauseDlg.addEventListener('close', () => {
   setTimer({ acc: elapsed(), pauseUntil: now() + n * 1000 });
   save(); tick();
 });
-$('#timer-reset').addEventListener('click', () => {
+$('#timer-reset').addEventListener('click', async () => {
   if (!can('timer')) return toast('Organizatorul a blocat cronometrul.');
   if (cooling()) return toast('Așteaptă câteva secunde: cronometrul tocmai a fost atins.');
-  if ((running() || paused()) && !confirm('Oprești și resetezi cronometrul?')) return;
+  if ((running() || paused()) && !await ask('Oprești și resetezi cronometrul?')) return;
   setTimer({});
   ring(false); keepAwake(false); save(); tick();
 });
-$('#new-game').addEventListener('click', () => {
-  if (!confirm(`Începi meciul ${state.game + 1}? Scorul pornește de la 0–0.`)) return;
+$('#new-game').addEventListener('click', async () => {
+  if (!await ask(`Începi meciul ${state.game + 1}? Scorul pornește de la 0–0.`)) return;
   keepAwake(false);
   commit(() => { closeMatch('manual'); newGame(); });
 });
@@ -781,9 +789,9 @@ function renderGoals() {
           <button class="ghost-btn sm danger-x" data-del-goal="${g.id}" aria-label="Șterge golul">✕</button></div>`).join('');
     }).join('')}</div>`;
 }
-$('#goals').addEventListener('click', e => {
+$('#goals').addEventListener('click', async e => {
   const id = e.target.closest('[data-del-goal]')?.dataset.delGoal;
-  if (id && confirm('Ștergi golul?')) commit(() => { state.goals = state.goals.filter(g => g.id !== id); });
+  if (id && await ask('Ștergi golul?')) commit(() => { state.goals = state.goals.filter(g => g.id !== id); });
 });
 
 /* ---------- sesiuni ---------- */
@@ -998,7 +1006,7 @@ smDlg.addEventListener('click', async e => {
   if (b.dataset.open) { smDlg.close(); return useSession(store.sessions[b.dataset.open]); }
   if (b.dataset.del) {
     const s = store.sessions[b.dataset.del];
-    if (!confirm(`Ștergi sesiunea „${s.name}” de pe acest dispozitiv?`)) return;
+    if (!await ask(`Ștergi sesiunea „${s.name}” de pe acest dispozitiv?`)) return;
     delete store.sessions[s.id];
     if (s.id === state.id) {
       smDlg.close();
@@ -1029,7 +1037,7 @@ smDlg.addEventListener('click', async e => {
   if (act === 'logout') { await fb.auth.signOut(fb.au); fb.me = null; toast('Ai ieșit din contul de organizator.'); return fillMenu(); }
   if (act === 'live-share') return shareLink();
   if (act === 'live-end') {
-    if (!confirm('Închei sesiunea live? Fiecare rămâne cu copia locală, iar sesiunea se șterge de pe server.')) return;
+    if (!await ask('Închei sesiunea live? Fiecare rămâne cu copia locală, iar sesiunea se șterge de pe server.')) return;
     const sid = state.live;
     // întâi ne dezabonăm, ca ștergerea să nu apară aici ca „încheiată de organizator”
     Object.assign(state, { live: null, mine: false }); persist(); goLive(); render();
@@ -1039,7 +1047,7 @@ smDlg.addEventListener('click', async e => {
     return fillMenu();
   }
   if (act === 'live-off') {
-    if (!confirm('Sesiunea rămâne pe acest dispozitiv, dar nu se mai sincronizează. Continui?')) return;
+    if (!await ask('Sesiunea rămâne pe acest dispozitiv, dar nu se mai sincronizează. Continui?')) return;
     state.live = null; persist(); goLive(); render();
     return fillMenu();
   }
@@ -1047,7 +1055,7 @@ smDlg.addEventListener('click', async e => {
   if (act === 'import') importSession(false);
   if (act === 'new') openNew('new');
   if (act === 'replace') openNew('replace');
-  if (act === 'clear' && confirm('Toți jucătorii revin în listă. Continui?')) commit(() => state.teams.forEach(t => { t.slots.fill(null); t.custom = {}; }));
+  if (act === 'clear' && await ask('Toți jucătorii revin în listă. Continui?')) commit(() => state.teams.forEach(t => { t.slots.fill(null); t.custom = {}; }));
 });
 
 /* ---------- versiune nouă pe server ---------- */
@@ -1397,7 +1405,7 @@ function restore(h) { // fără commit(): animația s-ar desena peste panoul des
   save(); render();
 }
 async function newLink() {
-  if (!confirm('Linkul vechi nu va mai merge. Îl trimiți din nou doar cui vrei. Continui?')) return;
+  if (!await ask('Linkul vechi nu va mai merge. Îl trimiți din nou doar cui vrei. Continui?')) return;
   const old = state.live, sid = newSid(), keep = { ...perm };
   try { await fb.set(fb.ref(fb.db, `live/${sid}/owner`), fb.me); }
   catch { return toast('Nu am putut crea linkul nou.'); }
@@ -1410,13 +1418,13 @@ async function newLink() {
   fillOrg();
   shareLink();
 }
-orgDlg.addEventListener('click', e => {
+orgDlg.addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.adj) return adjust(+b.dataset.adj);
   if (b.dataset.restore) {
     const h = state.history[+b.dataset.restore];
-    if (h && confirm(`Readuci meciul cum era la ${hhmm(h.at)}?`)) { restore(h); fillOrg(); }
+    if (h && await ask(`Readuci meciul cum era la ${hhmm(h.at)}?`)) { restore(h); fillOrg(); }
   }
   if (b.dataset.act === 'new-link') newLink();
 });
